@@ -2,8 +2,8 @@
 """
 HTML Report Generator for wuzhangaishijueceshi skill.
 
-Optimized for: 100x100 Grid Micro-Analysis, Printability (Force Expand),
-Click-to-enlarge Lightbox, and Target-Node Annotation.
+Optimized for: 100x100 Grid Micro-Analysis (High Density), Expanded Deep Recommendations,
+Printability (Force Expand), Click-to-enlarge Lightbox, and Target-Node Annotation.
 """
 
 import base64
@@ -158,14 +158,14 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
     if 'color_analysis' in analysis_data:
         html_content += generate_contrast_section(analysis_data['color_analysis'])
 
-    # ========================================================
-    # 核心新模块：100x100 网格微观排查 (只渲染异常切片)
-    # ========================================================
+    # 100x100 网格微观排查
     if 'grid_issues' in analysis_data:
         html_content += generate_grid_analysis_section(analysis_data['grid_issues'])
 
     if 'similar_regions' in analysis_data:
         html_content += generate_similar_regions_section(analysis_data)
+
+    html_content += generate_recommendations_section(analysis_data)
 
     html_content += generate_cvd_section(analysis_data)
     html_content += generate_glossary_section()
@@ -225,8 +225,7 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
         f.write(html_content)
 
 def generate_grid_analysis_section(grid_issues):
-    if not grid_issues:
-        return "" # 用户要求：正常的不显示
+    if not grid_issues: return ""
 
     html = f'''
         <section class="bg-white rounded-xl border border-slate-200 shadow-sm" aria-label="网格微观排查">
@@ -246,23 +245,23 @@ def generate_grid_analysis_section(grid_issues):
                 </div>
             </div>
             
-            <div id="grid-content" class="p-6 hidden print-expanded grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div id="grid-content" class="p-6 hidden print-expanded grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3">
     '''
     
     for issue in grid_issues:
         html += f'''
                 <div class="border border-rose-200 rounded-lg bg-rose-50/30 flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                    <div class="h-24 flex items-center justify-center relative p-1.5 border-b border-rose-100">
+                    <div class="h-20 flex items-center justify-center relative p-1.5 border-b border-rose-100">
                         <img src="data:image/jpeg;base64,{issue['image_base64']}" class="h-full w-full object-cover rounded-sm border border-slate-200">
                     </div>
                     <div class="bg-white p-2 text-center flex-1 flex flex-col justify-center">
-                        <div class="text-[9px] text-slate-400 font-mono mb-1.5">{issue['coord']}</div>
+                        <div class="text-[9px] text-slate-400 font-mono mb-1.5 truncate">{issue['coord']}</div>
                         <div class="flex items-center justify-center gap-1.5 text-[10px]">
                             <div class="w-3.5 h-3.5 rounded-full border border-slate-200 shadow-inner" style="background-color: {issue['c1']}"></div>
                             <span class="text-slate-300">/</span>
                             <div class="w-3.5 h-3.5 rounded-full border border-slate-200 shadow-inner" style="background-color: {issue['c2']}"></div>
                         </div>
-                        <div class="mt-2 text-[10px] font-black text-rose-600">低对比 {issue['ratio']:.1f}:1</div>
+                        <div class="mt-2 text-[10px] font-black text-rose-600 truncate">{issue['ratio']:.1f}:1</div>
                     </div>
                 </div>
         '''
@@ -372,6 +371,66 @@ def generate_similar_regions_section(analysis_data):
                     {melt_html}
                 </div>
         '''
+    html += '</div></section>'
+    return html
+
+def generate_recommendations_section(analysis_data):
+    html = '''
+        <section class="bg-slate-900 rounded-xl shadow-xl no-print" aria-label="智能修复工单">
+            <div class="px-6 py-5 bg-slate-800 border-b border-slate-700 rounded-t-xl">
+                <h2 class="text-white font-bold flex items-center gap-2"><span class="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>智能修复建议中心</h2>
+                <p class="text-[11px] text-slate-400 mt-1">系统已针对不合格的色彩配对，计算出最优的替代色谱。</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    '''
+    pairs = analysis_data.get('color_analysis', {}).get('color_pairs', [])
+    failed_pairs = [p for p in pairs if not p['metrics']['aa_normal']]
+    
+    for idx, pair in enumerate(failed_pairs[:6]):
+        orig_c, bg_c = pair['color1']['hex'], pair['color2']['hex']
+        ratio = pair['metrics'].get('ratio', 0)
+        
+        if ratio < 2.0:
+            diag = "对比度极度匮乏，导致文本/图标在背景上几乎隐形。"
+        else:
+            diag = "对比度处于危险边缘，低视力用户在户外阳光下无法阅读。"
+
+        html += f'''
+            <div class="border border-slate-700 rounded-lg p-5 bg-slate-800/40 flex flex-col justify-between">
+                <div>
+                    <span class="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2 block">修复工单 #{idx+1}</span>
+                    <p class="text-[11px] text-slate-300 leading-relaxed mb-4">
+                        前景色 <span class="text-rose-300 font-mono">{orig_c}</span> 在底色 <span class="text-slate-500 font-mono">{bg_c}</span> 上不达标。
+                        <br><span class="text-slate-400 mt-1 block"><b>深度诊断：</b>{diag}</span>
+                    </p>
+                </div>
+        '''
+        if pair.get('safe_palette_suggestion'):
+            safe = pair['safe_palette_suggestion']
+            html += f'''
+                <div class="bg-slate-800 p-3 rounded border border-slate-700 mt-2">
+                    <p class="text-[9px] text-indigo-400 font-bold uppercase mb-2">🏆 推荐：色盲安全色</p>
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded shadow-inner" style="background-color: {safe['hex']}"></div>
+                        <div><div class="text-[11px] font-bold text-white">{safe['name']}</div><div class="text-[10px] font-mono text-emerald-400">{safe['hex']}</div></div>
+                    </div>
+                </div>
+            '''
+        elif pair.get('suggestion'):
+            auto_c = pair['suggestion']['hex']
+            html += f'''
+                <div class="bg-slate-800 p-3 rounded border border-slate-700 mt-2">
+                    <p class="text-[9px] text-slate-400 font-bold uppercase mb-2">备选：明度微调色</p>
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded shadow-inner" style="background-color: {auto_c}"></div>
+                        <div class="text-[10px] font-mono text-indigo-400">{auto_c}</div>
+                    </div>
+                </div>
+            '''
+        html += '</div>'
+        
+    if not failed_pairs:
+        html += '<div class="text-emerald-400 text-sm">🎉 完美！色彩对比度全线通过测试，无需修复。</div>'
     html += '</div></section>'
     return html
 
