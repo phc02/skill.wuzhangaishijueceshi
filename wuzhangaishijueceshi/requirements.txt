@@ -1,0 +1,31 @@
+# Core dependencies for wuzhangaishijueceshi (无障碍色彩测试) skill
+
+# Image processing
+Pillow>=9.0.0
+
+# Numerical computing
+numpy>=1.21.0
+
+# Machine learning for color extraction
+scikit-learn>=1.0.0
+
+# Image segmentation for similar region detection
+scikit-image>=0.19.0
+
+# Color space conversions and calculations
+colour-science>=0.4.0
+colormath>=3.0.0
+
+# Color name handling
+webcolors>=1.12.0
+
+# HTML generation
+Jinja2>=3.0.0
+
+# Web page analysis (optional - for URL analysis)
+selenium>=4.0.0
+requests>=2.28.0
+beautifulsoup4>=4.11.0
+
+# Optional: For scipy-based operations
+scipy>=1.7.0

@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>无障碍色彩测试报告</title>
+    <style>
+        /* Modern, elegant styling - self-contained */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .score-card {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin: 20px auto;
+            max-width: 400px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .score-value {
+            font-size: 4em;
+            font-weight: bold;
+            color: #667eea;
+            text-align: center;
+        }
+
+        .score-label {
+            text-align: center;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .score-bar {
+            height: 10px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+
+        .score-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 5px;
+            transition: width 0.5s ease;
+        }
+
+        section {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        section h2 {
+            color: #333;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .summary-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .summary-item .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .summary-item .label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        th:hover {
+            background: #e9ecef;
+        }
+
+        .color-swatch {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+
+        .pass {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .fail {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .warning {
+            color: #ffc107;
+            font-weight: bold;
+        }
+
+        .image-viewer {
+            position: relative;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .image-viewer img {
+            width: 100%;
+            display: block;
+        }
+
+        .simulation-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .simulation-item {
+            text-align: center;
+        }
+
+        .simulation-item img {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .simulation-item .label {
+            margin-top: 10px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .recommendations-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .recommendations-list li {
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+
+        .recommendations-list .priority {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .priority-high {
+            background: #dc3545;
+            color: white;
+        }
+
+        .priority-medium {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .priority-low {
+            background: #28a745;
+            color: white;
+        }
+
+        .code-snippet {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>无障碍色彩测试报告</h1>
+            <p>Wuzhangaishijueceshi Accessibility Analysis</p>
+        </header>
+
+        <section id="summary">
+            <h2>执行摘要</h2>
+            <div class="score-card">
+                <div class="score-value">28</div>
+                <div class="score-label">综合评分 (0-100)</div>
+                <div class="score-bar">
+                    <div class="score-fill" style="width: 28%"></div>
+                </div>
+            </div>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="value">2026-04-24 15:41:38</div>
+                    <div class="label">分析时间</div>
+                </div>
+                <div class="summary-item">
+                    <div class="value">C:\Users\MI\.claude\skills\wuzhangaishijueceshi\test_image.png</div>
+                    <div class="label">输入源</div>
+                </div>
+                <div class="summary-item">
+                    <div class="value">5.0</div>
+                    <div class="label">相似阈值 (Delta E)</div>
+                </div>
+            </div>
+        </section>
+
+        <section id="contrast-analysis">
+            <h2>色彩对比度分析</h2>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="value">18.1%</div>
+                    <div class="label">AA 合规率</div>
+                </div>
+                <div class="summary-item">
+                    <div class="value">8.6%</div>
+                    <div class="label">AAA 合规率</div>
+                </div>
+                <div class="summary-item">
+                    <div class="value">105</div>
+                    <div class="label">分析颜色对</div>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 20px;">问题颜色对 (最低对比度)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>颜色 1</th>
+                        <th>颜色 2</th>
+                        <th>对比度</th>
+                        <th>WCAG 等级</th>
+                        <th>AA 合规</th>
+                        <th>AAA 合规</th>
+                    </tr>
+                </thead>
+                <tbody>
+    
+                    <tr>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>1.00:1</td>
+                        <td>Fail</td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>1.00:1</td>
+                        <td>Fail</td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>1.00:1</td>
+                        <td>Fail</td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>1.00:1</td>
+                        <td>Fail</td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>1.00:1</td>
+                        <td>Fail</td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>1.00:1</td>
+                        <td>Fail</td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>1.00:1</td>
+                        <td>Fail</td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>1.00:1</td>
+                        <td>Fail</td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>1.00:1</td>
+                        <td>Fail</td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                    </tr>
+        
+                    <tr>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>
+                            <span class="color-swatch" style="background: #ffffff"></span>
+                            #ffffff
+                        </td>
+                        <td>1.00:1</td>
+                        <td>Fail</td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                        <td class="fail">
+                            ✗
+                        </td>
+                    </tr>
+        
+                </tbody>
+            </table>
+        </section>
+    
+        <section id="similar-regions">
+            <h2>相近区域颜色分析</h2>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="value">79</div>
+                    <div class="label">相似区域对</div>
+                </div>
+                <div class="summary-item">
+                    <div class="value">5.0</div>
+                    <div class="label">阈值 (Delta E)</div>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 20px;">问题区域列表</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>区域 1</th>
+                        <th>区域 2</th>
+                        <th>Delta E</th>
+                        <th>严重程度</th>
+                    </tr>
+                </thead>
+                <tbody>
+    
+                    <tr>
+                        <td>区域 1</td>
+                        <td>区域 2</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 2</td>
+                        <td>区域 3</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 3</td>
+                        <td>区域 4</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 4</td>
+                        <td>区域 5</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 4</td>
+                        <td>区域 14</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 5</td>
+                        <td>区域 6</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 5</td>
+                        <td>区域 14</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 6</td>
+                        <td>区域 7</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 6</td>
+                        <td>区域 11</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 7</td>
+                        <td>区域 8</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 7</td>
+                        <td>区域 11</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 8</td>
+                        <td>区域 9</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 8</td>
+                        <td>区域 11</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 9</td>
+                        <td>区域 19</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 10</td>
+                        <td>区域 20</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 11</td>
+                        <td>区域 27</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 14</td>
+                        <td>区域 29</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 17</td>
+                        <td>区域 25</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 18</td>
+                        <td>区域 26</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                    <tr>
+                        <td>区域 19</td>
+                        <td>区域 30</td>
+                        <td>0.00</td>
+                        <td><span class="priority priority-high">高</span></td>
+                    </tr>
+        
+                </tbody>
+            </table>
+        </section>
+    
+        <section id="colorblind-simulations">
+            <h2>色盲友好性评估</h2>
+            <p>以下模拟展示了页面在不同色盲类型用户眼中的外观：</p>
+
+            <div class="simulation-gallery">
+    
+                <div class="simulation-item">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAETUlEQVR4nO3WQWrCUBhG0aS4rm7HYenILEFH4tDtuLHXFQgSAvHac6bhh28QLm8eY0wABV97DwB4lWABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAxmF6S7frvPeEkp/fsfbwe+stn+x2faw7nOeVh//TGE9/Sy8sIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8iYxxh7bwB4iRcWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWEDGYXpLx+Nx7wkl9/t93eGyLFtv+WTn83nd4eVy2XrLJzudTs8+eWEBGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQMY8xth7A8BLvLCADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsYKr4Aw2fHVHIMzKlAAAAAElFTkSuQmCC" alt="Protanopia (Red-Blind)">
+                    <div class="label">Protanopia (Red-Blind)</div>
+                </div>
+            
+                <div class="simulation-item">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAEUElEQVR4nO3W0YnCUBRF0WSwkOlgqrEGSzAlaAnWMNXYgZ28qUCQIMSdWes3XDgfYfPmMcYEUPC19QCAVwkWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZBymj3Q/zltPKPn5HWsPv9+9Zc/ux8e6w3leefg/jfH0t/TCAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsICMeYyx9QaAl3hhARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkHKaPdDqdtp5Qcrvd1h0uy/LuLXt2uVzWHV6v13dv2bPz+fzskxcWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWTMY4ytNwC8xAsLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAqaKPw2fHVGY98OFAAAAAElFTkSuQmCC" alt="Protanomaly (Red-Weak)">
+                    <div class="label">Protanomaly (Red-Weak)</div>
+                </div>
+            
+                <div class="simulation-item">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAETElEQVR4nO3WwYnCUBhG0WSwPXuYnSXEEpIS3NmDBb6pQJAgxOucsw0/fItwefMYYwIo+Dl6AMCrBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyTtNHuj/moyeU/J7H3sPzu7d8s/vjse9wnnce/k9jPP0tvbCADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIGMeYxy9AeAlXlhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmn6SNdLpejJ5Tcbrd9h9fr9d1bvtm6rvsOt21795ZvtizLs09eWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQMY8xjt4A8BIvLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAuYKv4ADZ8dUeGd3k0AAAAASUVORK5CYII=" alt="Deuteranopia (Green-Blind)">
+                    <div class="label">Deuteranopia (Green-Blind)</div>
+                </div>
+            
+                <div class="simulation-item">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAEU0lEQVR4nO3WYW3CUBhG4XbByhRsCjBTCSABJGAGBUzBxNwpICENSTnsef42X/L+aE7uPMaYAAo+th4A8CjBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgIzd9JJ+9vPWE0q+rmPd4ff189lb3tlt/7vucJ5XHv5PY9z9Lb2wgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBjHmNsvQHgIV5YQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZu+klLcuy9YSSy+Wy7vB4PD57yzs7nU7rDs/n87O3vLPD4XDvkxcWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWTMY4ytNwA8xAsLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAqaKPw7OHVGH13F9AAAAAElFTkSuQmCC" alt="Deuteranomaly (Green-Weak)">
+                    <div class="label">Deuteranomaly (Green-Weak)</div>
+                </div>
+            
+                <div class="simulation-item">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAES0lEQVR4nO3WsWnDUBhGUSm4zZwuU0pkgCCXKT2nB3iZwGCEQb7OOa344SvE5c1jjAmg4OPoAQCPEiwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIOE0v6TbPR08o+Rxj5+HX97O3vLPb78++w3nv4f807v+WXlhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkDGPMY7eAPAQLywgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgIzT9JLO5/PRE0qu1+u+w3Vdn73lnW3btu/wcrk8e8s7W5bl3icvLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvImMcYR28AeIgXFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVMFX8Nnx1Rzu6Q7QAAAABJRU5ErkJggg==" alt="Tritanopia (Blue-Blind)">
+                    <div class="label">Tritanopia (Blue-Blind)</div>
+                </div>
+            
+                <div class="simulation-item">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAET0lEQVR4nO3WwWnDUBRFQSl4k2pSRWpRCXIJVgmuJVWkGi9/KjAYYZCPM7MVD+5CHP48xpgACj6OHgDwKMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CAjNP0km7zfPSEks8xdh7+fD17yzu7ff/uO5z3Hv5P4/5v6YUFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARnzGOPoDQAP8cICMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8g4TS9pWZajJ5Rcr9d9h+fz+dlb3tnlctl3uG3bs7e8s3Vd733ywgIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CAjHmMcfQGgId4YQEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVjAVPEHDZ8dUfpUyBUAAAAASUVORK5CYII=" alt="Tritanomaly (Blue-Weak)">
+                    <div class="label">Tritanomaly (Blue-Weak)</div>
+                </div>
+            
+                <div class="simulation-item">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAEUUlEQVR4nO3W0anCQBRF0fiwDzuyDm1AsALBBrQOO7KR4VUgSAjEHdb6HS6cr83sxhgTQMHf2gMAviVYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkLGfftLxeFx7Qsnr9Zp3+Hg8lt6yZefzed7h4XBYesuWvd/vT09+WECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQsRtjrL0B4Ct+WECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGfvpJ51Op7UnlDyfz3mH1+t16S1bdrvd5h3e7/elt2zZ5XL59OSHBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZuzHG2hsAvuKHBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAFTxT/Z8B1IAzYTpQAAAABJRU5ErkJggg==" alt="Achromatopsia (Total Color Blindness)">
+                    <div class="label">Achromatopsia (Total Color Blindness)</div>
+                </div>
+            
+                <div class="simulation-item">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAEYElEQVR4nO3WwUkDURhG0URSQOrQDixDO3CTEhJwLSQlZGMHWoYdaB2pIGMFgTAMTG44Z/v44Vtd3nIYzguAgoe5BwBcS7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgY7W4SZ+PT3NPKHn7+x13+PLzOvWWe/b9/DXucL3+mHrLPTud3i89+WEBGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQMZyGM5zbwC4ih8WkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWEDGanGTNpvN3BNKjsfjuMPdbjf1lnu23+/HHR4Oh6m33LPtdnvpyQ8LyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjKWw3CeewPAVfywgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLCBDsIAMwQIyBAvIECwgQ7CADMECMgQLyBAsIEOwgAzBAjIEC8gQLGBR8Q9Kox1Odc796QAAAABJRU5ErkJggg==" alt="Achromatomaly (Partial Color Blindness)">
+                    <div class="label">Achromatomaly (Partial Color Blindness)</div>
+                </div>
+            
+                <div class="simulation-item">
+                    <img src="data:image/png;base64,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" alt="对比图">
+                    <div class="label">对比图</div>
+                </div>
+            
+            </div>
+        </section>
+    
+        <section id="recommendations">
+            <h2>开发者建议</h2>
+            <ul class="recommendations-list">
+    
+            <li>
+                <span class="priority priority-high">HIGH</span>
+                提升色彩对比度以满足 WCAG AA 标准
+                <div class="code-snippet">/* 增加文本与背景的对比度 */
+color: #333; /* 深色文本 */
+background: #fff; /* 浅色背景 */</div>
+            </li>
+        
+            <li>
+                <span class="priority priority-medium">MEDIUM</span>
+                调整相近区域的颜色以提高可区分性
+                <div class="code-snippet">/* 使用更明显的颜色差异 */
+.primary { color: #0066cc; }
+.secondary { color: #004499; }</div>
+            </li>
+        
+            </ul>
+        </section>
+    
+        <footer>
+            <p>Generated by 无障碍色彩测试 (Wuzhangaishijueceshi) Skill</p>
+            <p>Based on WCAG 2.1/2.2 Accessibility Standards</p>
+        </footer>
+    </div>
+
+    <script>
+        // Interactive table sorting
+        document.querySelectorAll('th').forEach(th => {
+            th.addEventListener('click', () => {
+                const table = th.closest('table');
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                const colIndex = Array.from(th.parentElement.children).indexOf(th);
+
+                rows.sort((a, b) => {
+                    const aVal = a.children[colIndex].textContent;
+                    const bVal = b.children[colIndex].textContent;
+                    return aVal.localeCompare(bVal);
+                });
+
+                rows.forEach(row => tbody.appendChild(row));
+            });
+        });
+    </script>
+</body>
+</html>

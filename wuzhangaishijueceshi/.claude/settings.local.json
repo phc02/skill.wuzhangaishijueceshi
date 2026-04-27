@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python scripts/main.py test_image.png -v)",
+      "Bash(pip install *)",
+      "Bash(python scripts/main.py \"D:\\\\项目04-武汉参观动线大屏\\\\Frame8.png\" -v)",
+      "Bash(python scripts/main.py \"C:\\\\Users\\\\MI\\\\.claude\\\\skills\\\\wuzhangaishijueceshi\\\\test_image.png\" -v)",
+      "Bash(python scripts/main.py \"D:\\\\项目02-Banner图MIracle\\\\4.3培训通知02.png\" -v)",
+      "Bash(python -c \"from PIL import Image; import os; import glob; files = glob.glob\\('**/*.png', recursive=True\\) + glob.glob\\('**/*.jpg', recursive=True\\) + glob.glob\\('**/*.jpeg', recursive=True\\); [print\\(f'{f}: {Image.open\\(f\\).size}'\\) for f in files[:20] if os.path.exists\\(f\\)]\")"
+    ]
+  }
+}
