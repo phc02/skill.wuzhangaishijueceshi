@@ -3,8 +3,7 @@
 Main orchestrator for wuzhangaishijueceshi (无障碍色彩测试) skill.
 
 This script coordinates the analysis of web pages and images for accessibility
-color issues, including similar color region detection, WCAG compliance checking,
-and colorblind friendliness evaluation.
+color issues, and outputs both an HTML dashboard and a terminal summary for LLMs.
 """
 
 import argparse
@@ -18,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from image_analyzer import analyze_image_file
 from web_analyzer import analyze_web_page
-from html_report_generator import generate_html_report
+from html_report_generator import generate_html_report, calculate_overall_score
 
 
 def is_url(input_string):
@@ -27,22 +26,11 @@ def is_url(input_string):
 
 
 def analyze_component_level(analysis_data, component_region=None):
-    """
-    Analyze a specific component/region of the image.
-
-    Args:
-        analysis_data: Dictionary containing analysis results
-        component_region: Optional region coordinates (x, y, width, height)
-
-    Returns:
-        Dictionary with component-level analysis
-    """
     if component_region:
         analysis_data['component_region'] = component_region
         analysis_data['analysis_type'] = 'component'
     else:
         analysis_data['analysis_type'] = 'full'
-
     return analysis_data
 
 
@@ -60,34 +48,11 @@ Examples:
         '''
     )
 
-    parser.add_argument(
-        'input',
-        help='URL, image file path, or component identifier'
-    )
-
-    parser.add_argument(
-        '-o', '--output',
-        help='Output HTML report path (default: accessibility_report_YYYYMMDD_HHMMSS.html)'
-    )
-
-    parser.add_argument(
-        '-c', '--component',
-        action='store_true',
-        help='Enable component-level testing'
-    )
-
-    parser.add_argument(
-        '-t', '--threshold',
-        type=float,
-        default=5.0,
-        help='Color similarity threshold (Delta E, default: 5.0)'
-    )
-
-    parser.add_argument(
-        '-v', '--verbose',
-        action='store_true',
-        help='Enable verbose output'
-    )
+    parser.add_argument('input', help='URL, image file path, or component identifier')
+    parser.add_argument('-o', '--output', help='Output HTML report path')
+    parser.add_argument('-c', '--component', action='store_true', help='Enable component-level testing')
+    parser.add_argument('-t', '--threshold', type=float, default=5.0, help='Color similarity threshold (Delta E, default: 5.0)')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
 
     args = parser.parse_args()
 
@@ -107,18 +72,10 @@ Examples:
         output_dir.mkdir(exist_ok=True)
         output_path = str(output_dir / f'accessibility_report_{timestamp}.html')
 
-    # Analyze input based on type
-    if args.verbose:
-        print(f"Analyzing: {args.input}")
-
     try:
         if is_url(args.input):
-            if args.verbose:
-                print("  → Detected URL, capturing screenshot...")
             analysis_data = analyze_web_page(args.input)
         else:
-            if args.verbose:
-                print("  → Detected image file, analyzing colors...")
             analysis_data = analyze_image_file(args.input)
 
         # Add metadata
@@ -126,31 +83,50 @@ Examples:
         analysis_data['analysis_date'] = datetime.now().isoformat()
         analysis_data['threshold'] = args.threshold
 
-        # Component-level analysis if requested
         if args.component:
-            if args.verbose:
-                print("  → Performing component-level analysis...")
             analysis_data = analyze_component_level(analysis_data)
 
         # Generate HTML report
-        if args.verbose:
-            print(f"  → Generating HTML report: {output_path}")
-
         generate_html_report(analysis_data, output_path, threshold=args.threshold)
 
-        if args.verbose:
-            print(f"\n✓ Analysis complete!")
-            print(f"  Report saved to: {output_path}")
-
-        print(f"\nAccessibility report generated: {output_path}")
+        # ---------------------------------------------------------
+        # 新增：专为 Claude LLM 准备的终端数据摘要 (LLM Readout)
+        # ---------------------------------------------------------
+        overall_score = calculate_overall_score(analysis_data)
+        
+        print("\n=== SYSTEM_SUMMARY_FOR_LLM ===")
+        print(f"STATUS: SUCCESS")
+        print(f"REPORT_PATH: {output_path}")
+        print(f"OVERALL_SCORE: {overall_score}/100")
+        
+        if 'color_analysis' in analysis_data:
+            stats = analysis_data['color_analysis'].get('statistics', {})
+            print(f"AA_COMPLIANCE_RATE: {stats.get('aa_pass_rate', 0):.1%}")
+            
+            pairs = analysis_data['color_analysis'].get('color_pairs', [])
+            failed_pairs = [p for p in pairs if p.get('suggestion')]
+            print(f"CONTRAST_ISSUES_FOUND: {len(failed_pairs)}")
+            if failed_pairs:
+                print(f"TOP_ISSUE: Hex {failed_pairs[0]['color1']['hex']} on {failed_pairs[0]['color2']['hex']} (Ratio {failed_pairs[0]['contrast_ratio']:.2f}:1)")
+                print(f"AUTO_FIX_SUGGESTED: {failed_pairs[0]['suggestion']['hex']}")
+                
+        print("==============================\n")
+        
+        # 面向用户的常规输出
+        print(f"✨ 无障碍分析完成！评分: {overall_score}/100")
+        print(f"📄 详细 Dashboard 报告已生成: {output_path}")
 
     except Exception as e:
-        print(f"Error during analysis: {e}")
+        print(f"\n=== SYSTEM_SUMMARY_FOR_LLM ===")
+        print(f"STATUS: ERROR")
+        print(f"ERROR_MSG: {str(e)}")
+        print("==============================\n")
+        
+        print(f"执行出错: {e}")
         if args.verbose:
             import traceback
             traceback.print_exc()
         sys.exit(1)
-
 
 if __name__ == '__main__':
     main()
