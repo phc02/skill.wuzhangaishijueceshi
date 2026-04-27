@@ -58,7 +58,6 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
     </script>
     <style>
         body {{ background-color: #f8fafc; font-family: 'Inter', sans-serif; }}
-        /* 自定义滚动条，提升 B 端质感 */
         ::-webkit-scrollbar {{ width: 6px; height: 6px; }}
         ::-webkit-scrollbar-track {{ background: #f1f5f9; }}
         ::-webkit-scrollbar-thumb {{ background: #cbd5e1; border-radius: 3px; }}
@@ -150,8 +149,8 @@ def generate_contrast_section(color_analysis):
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">前景内容色</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">背景底色</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">测定对比度</th>
-                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">AA 标准 (4.5:1)</th>
-                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">AAA 标准 (7.0:1)</th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">AA 标准</th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">智能算法建议</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-slate-100">
@@ -160,11 +159,21 @@ def generate_contrast_section(color_analysis):
     pairs = color_analysis.get('color_pairs', [])
     for pair in pairs[:10]:
         aa_pass = pair['compliance']['aa']
-        aaa_pass = pair['compliance']['aaa']
         
         aa_badge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Pass</span>' if aa_pass else '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800">Fail</span>'
-        aaa_badge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Pass</span>' if aaa_pass else '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">Fail</span>'
         
+        # 动态渲染算法推送的建议色值
+        suggestion_html = '<span class="text-slate-400 text-sm italic">无需修改</span>'
+        suggestion = pair.get('suggestion')
+        if suggestion:
+            suggestion_html = f'''
+                <div class="flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    <div class="w-6 h-6 rounded border border-slate-200 shadow-inner" style="background-color: {suggestion['hex']}"></div>
+                    <span class="text-sm font-mono text-emerald-700 font-medium">{suggestion['hex']}</span>
+                </div>
+            '''
+
         html += f'''
                         <tr class="hover:bg-slate-50 transition-colors duration-150">
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -183,7 +192,7 @@ def generate_contrast_section(color_analysis):
                                 <span class="text-sm font-semibold text-slate-900">{pair['contrast_ratio']:.2f} : 1</span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">{aa_badge}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center">{aaa_badge}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center bg-slate-50 border-l border-slate-100">{suggestion_html}</td>
                         </tr>
         '''
     html += '''
@@ -264,45 +273,57 @@ def generate_recommendations_section(analysis_data):
         <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div class="px-6 py-5 border-b border-slate-200 bg-slate-50">
                 <h2 class="text-lg font-semibold text-slate-800">智能修复工单 (Actionable Fixes)</h2>
+                <p class="mt-1 text-sm text-slate-500">基于二分查找算法为您推算的最近合规 CSS 色值，可直接复制使用。</p>
             </div>
             <div class="p-6 space-y-4">
     '''
     
     recommendations = []
+    
+    # 核心：动态提取底层计算出的 suggestion 并生成精准修复工单
     if 'color_analysis' in analysis_data:
-        stats = analysis_data['color_analysis'].get('statistics', {})
-        if stats.get('aa_pass_rate', 1.0) < 0.8:
+        pairs = analysis_data['color_analysis'].get('color_pairs', [])
+        failed_pairs = [p for p in pairs if p.get('suggestion')]
+        
+        # 提取问题最严重的 top 3 生成独立工单
+        for idx, pair in enumerate(failed_pairs[:3]):
+            orig_color = pair['color1']['hex']
+            bg_color = pair['color2']['hex']
+            new_color = pair['suggestion']['hex']
+            contrast = pair['contrast_ratio']
+            
             recommendations.append({
-                'type': 'Contrast Issue',
+                'type': f'Action Item #{idx+1}',
                 'bg': 'bg-rose-50 border-rose-200',
-                'icon_text': 'text-rose-500',
-                'title': '全局文字对比度不达标',
-                'desc': '检测到大量文本与其背景的对比度低于 4.5:1。建议使用更深的字号颜色或降低背景亮度。',
-                'code': '/* 推荐的修正样式示例 */\n.text-element {\n  color: #1E293B; /* 提升亮度差 */\n}'
+                'icon_text': 'text-rose-600',
+                'title': f'修正低对比度元素 ({contrast:.2f}:1)',
+                'desc': f'前景内容色 <span class="font-mono bg-white px-1 border border-slate-200 rounded">{orig_color}</span> 在背景 <span class="font-mono bg-white px-1 border border-slate-200 rounded">{bg_color}</span> 上无法清晰阅读。算法已推算出最佳替代色。',
+                'code': f'/* 修复建议：直接替换组件 CSS 变量或属性 */\n.text-element {{\n  color: {new_color}; /* 已满足 WCAG AA 4.5:1 标准 */\n  background-color: {bg_color};\n}}'
             })
 
+    # 如果所有对比度都完美通过，给出一个系统级的 Best Practice
     if not recommendations:
         recommendations.append({
             'type': 'Best Practice',
             'bg': 'bg-indigo-50 border-indigo-200',
             'icon_text': 'text-indigo-500',
             'title': '多模态状态提示',
-            'desc': '系统状态（如报错、成功）不要仅依赖颜色传达。请确保配合图标或文字说明。',
-            'code': '\n<div class="text-red-500">邮箱格式错误</div>\n\n\n<div class="text-red-500"><svg>...</svg> 邮箱格式错误</div>'
+            'desc': '所有的颜色对比度均已通过测试。建议进一步确保系统状态（如报错、成功）不要仅依赖颜色传达，应配合图标或文字说明。',
+            'code': '\n<div class="text-emerald-600">\n  <svg class="w-4 h-4 inline">...</svg> \n  操作成功\n</div>'
         })
 
     for rec in recommendations:
         html += f'''
-                <div class="border rounded-lg p-5 {rec['bg']}">
+                <div class="border rounded-lg p-5 {rec['bg']} shadow-sm">
                     <div class="flex items-start gap-4">
                         <div class="mt-1 {rec['icon_text']}">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
                         </div>
                         <div class="flex-1">
                             <div class="text-xs font-bold uppercase tracking-wider {rec['icon_text']} mb-1">{rec['type']}</div>
                             <h3 class="text-base font-semibold text-slate-900 mb-2">{rec['title']}</h3>
-                            <p class="text-sm text-slate-700 mb-4">{rec['desc']}</p>
-                            <div class="bg-slate-900 rounded-md p-4 overflow-x-auto">
+                            <p class="text-sm text-slate-700 mb-4 leading-relaxed">{rec['desc']}</p>
+                            <div class="bg-slate-900 rounded-md p-4 overflow-x-auto border border-slate-700">
                                 <pre class="text-sm font-mono text-emerald-400"><code>{rec['code']}</code></pre>
                             </div>
                         </div>
@@ -316,4 +337,4 @@ def generate_recommendations_section(analysis_data):
     return html
 
 if __name__ == '__main__':
-    print("HTML Report Generator Module optimized with Tailwind CSS.")
+    print("HTML Report Generator Module optimized with Tailwind CSS and Smart Suggestions.")
