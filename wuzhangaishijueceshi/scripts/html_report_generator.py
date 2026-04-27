@@ -2,8 +2,8 @@
 """
 HTML Report Generator for wuzhangaishijueceshi skill.
 
-Optimized for: Readability, Professional Terminology Explanations, 
-Printability, User Empathy, and CVD Boundary Melt Detection Visualization.
+Optimized for: Printability (PDF Colors Fixed), Clear Coordinates, 
+and Original Image vs CVD Simulation Layout.
 """
 
 import base64
@@ -28,7 +28,6 @@ def calculate_overall_score(analysis_data):
         similar = analysis_data['similar_regions']
         if 'total_issues' in similar:
             score -= min(20, similar['total_issues'] * 2)
-        # 绝杀功能：色盲边缘消融额外扣分
         melt_issues = sum(1 for r in similar.get('similar_regions', []) if r.get('melt_risks'))
         if melt_issues > 0:
             score -= min(15, melt_issues * 3)
@@ -71,12 +70,18 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
         }}
         .tooltip:hover .tooltiptext {{ visibility: visible; opacity: 1; }}
 
+        /* 强制浏览器在打印/导出PDF时渲染所有背景色和色块 */
         @media print {{
+            * {{
+                -webkit-print-color-adjust: exact !important; 
+                print-color-adjust: exact !important;
+            }}
             .no-print {{ display: none !important; }}
             body {{ background-color: white; }}
             .container {{ max-width: 100% !important; margin: 0 !important; padding: 0 !important; }}
-            .shadow-sm, .shadow-md, .shadow-lg {{ shadow: none !important; border: 1px solid #e2e8f0 !important; }}
-            header {{ background-color: #0f172a !important; -webkit-print-color-adjust: exact; }}
+            .shadow-sm, .shadow-md, .shadow-lg {{ box-shadow: none !important; border: 1px solid #e2e8f0 !important; }}
+            header {{ background-color: #0f172a !important; color: white !important; }}
+            .bg-slate-100 {{ background-color: #f1f5f9 !important; }}
         }}
 
         ::-webkit-scrollbar {{ width: 6px; }}
@@ -133,7 +138,7 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
                     <div class="flex justify-between items-end mb-2">
                         <span class="text-sm font-semibold text-slate-600">
                             APCA 视知觉合规率
-                            <span class="tooltip">ⓘ<span class="tooltiptext"><b>APCA (WCAG 3.0):</b> 现代视觉算法，根据人眼对不同背景下的文字亮度的真实感知来评分，比老标准更精准。</span></span>
+                            <span class="tooltip">ⓘ<span class="tooltiptext"><b>APCA (WCAG 3.0):</b> 现代视觉算法，比老标准更精准。</span></span>
                         </span>
                         <span class="text-lg font-bold text-indigo-600">{apca_rate:.1f}%</span>
                     </div>
@@ -141,9 +146,7 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
                 </div>
                 <div>
                     <div class="flex justify-between items-end mb-2">
-                        <span class="text-sm font-semibold text-slate-600">
-                            UI 控件边界清晰度
-                        </span>
+                        <span class="text-sm font-semibold text-slate-600">UI 控件边界清晰度</span>
                         <span class="text-lg font-bold text-sky-600">{ui_rate:.1f}%</span>
                     </div>
                     <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-sky-500 h-2 rounded-full" style="width: {ui_rate}%"></div></div>
@@ -160,8 +163,8 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
 
     html_content += generate_recommendations_section(analysis_data)
 
-    if 'cvd_analysis' in analysis_data:
-        html_content += generate_cvd_section(analysis_data['cvd_analysis'])
+    if 'cvd_analysis' in analysis_data or 'original_image_base64' in analysis_data:
+        html_content += generate_cvd_section(analysis_data)
 
     html_content += generate_glossary_section()
 
@@ -248,24 +251,24 @@ def generate_similar_regions_section(similar_regions):
         cvd_de = region.get('worst_cvd_delta_e', normal_de)
         melt_risks = region.get('melt_risks', [])
 
-        # 核心逻辑：基于 melt_risks 的存在与否决定 UI 等级
+        # 转换为具体的画面坐标 (X, Y)
+        b1 = region.get('region1_boundaries', {})
+        b2 = region.get('region2_boundaries', {})
+        pos1 = f"坐标(X:{b1.get('center_x', '?')}, Y:{b1.get('center_y', '?')})" if b1 else f"区域 {region['region1']}"
+        pos2 = f"坐标(X:{b2.get('center_x', '?')}, Y:{b2.get('center_y', '?')})" if b2 else f"区域 {region['region2']}"
+
         if melt_risks:
-            # 紫色高危告警 (色盲边缘消融)
             border_color, tag_bg, tag_text = "border-purple-300", "bg-purple-100", "text-purple-700"
             title = "🚨 色盲边缘消融"
         elif normal_de < 3:
-            # 常规红色告警
             border_color, tag_bg, tag_text = "border-rose-200", "bg-rose-100", "text-rose-700"
             title = "高危边界重叠"
         else:
-            # 常规黄色警告
             border_color, tag_bg, tag_text = "border-amber-200", "bg-amber-100", "text-amber-700"
             title = "中度边界模糊"
 
-        # 渲染特定的色盲暴跌警告
         melt_html = ""
         if melt_risks:
-            # 提取如 "Protanopia" 这样的词缀
             melt_types = ", ".join([m.split()[0] for m in melt_risks])
             melt_html = f'''
                 <div class="mt-3 p-2 bg-purple-50 border border-purple-100 rounded shadow-sm">
@@ -278,11 +281,13 @@ def generate_similar_regions_section(similar_regions):
 
         html += f'''
                 <div class="border {border_color} rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
-                    <div class="flex justify-between items-center mb-2">
+                    <div class="flex justify-between items-center mb-3">
                         <span class="text-xs font-bold text-slate-500 uppercase">{title}</span>
                         <span class="px-2 py-0.5 rounded text-[10px] font-black {tag_bg} {tag_text}">常规 ΔE {normal_de:.1f}</span>
                     </div>
-                    <p class="text-[11px] text-slate-600 leading-relaxed">区域 {region['region1']} 与区域 {region['region2']} 相邻。</p>
+                    <p class="text-[11px] text-slate-600 leading-relaxed">
+                        画面 <span class="font-mono bg-slate-100 px-1 rounded text-slate-500">{pos1}</span> 处的色块与其相邻的 <span class="font-mono bg-slate-100 px-1 rounded text-slate-500">{pos2}</span> 色块存在边界模糊风险。
+                    </p>
                     {melt_html}
                 </div>
         '''
@@ -362,7 +367,10 @@ def generate_recommendations_section(analysis_data):
     html += '</div></section>'
     return html
 
-def generate_cvd_section(cvd_analysis):
+def generate_cvd_section(analysis_data):
+    cvd_analysis = analysis_data.get('cvd_analysis', {})
+    orig_b64 = analysis_data.get('original_image_base64', '')
+
     cvd_meta = {
         "protanopia": {"desc": "红色盲", "pop": "男性发病率 ~1.0%", "detail": "由于缺乏长波长感光色素，难以区分红色与绿色。"},
         "deuteranopia": {"desc": "绿色盲", "pop": "男性发病率 ~1.1%", "detail": "最常见的色盲类型，难以辨别红、绿、褐色。"},
@@ -372,24 +380,39 @@ def generate_cvd_section(cvd_analysis):
     html = '''
         <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" aria-label="色盲视觉模拟">
             <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
-                <h2 class="font-bold text-slate-800">色觉障碍 (CVD) 视觉模拟</h2>
+                <h2 class="font-bold text-slate-800">色觉障碍 (CVD) 视觉模拟对比</h2>
             </div>
             <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
     '''
+    
+    # 置顶大图渲染
+    if orig_b64:
+        html += f'''
+                <div class="col-span-1 md:col-span-3 mb-2">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-sm font-bold text-slate-800 border-l-4 border-indigo-500 pl-2">基准视图 (Original Design)</h3>
+                        <span class="text-[10px] px-2 py-1 bg-slate-100 text-slate-500 rounded font-medium">普通正常视力</span>
+                    </div>
+                    <div class="rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-slate-50 flex justify-center p-2">
+                        <img src="data:image/png;base64,{orig_b64}" class="w-full h-auto object-contain max-h-[600px] hover:scale-[1.01] transition-transform duration-300">
+                    </div>
+                </div>
+        '''
+
     for cvd_type, cvd_data in cvd_analysis.items():
         meta = cvd_meta.get(cvd_type.lower(), {"desc": cvd_type, "pop": "-", "detail": ""})
         if 'image_base64' in cvd_data:
             html += f'''
                 <div class="space-y-3">
-                    <div class="rounded-lg overflow-hidden border border-slate-100 shadow-sm">
-                        <img src="data:image/png;base64,{cvd_data['image_base64']}" class="w-full h-auto grayscale-0 hover:scale-105 transition-transform duration-500">
+                    <div class="rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-slate-50 p-1">
+                        <img src="data:image/png;base64,{cvd_data['image_base64']}" class="w-full h-auto object-cover hover:scale-[1.02] transition-transform duration-300">
                     </div>
                     <div>
                         <div class="flex justify-between items-center">
                             <h3 class="text-sm font-bold text-slate-800">{meta['desc']} <span class="text-[10px] text-slate-400 font-normal">({cvd_data['name']})</span></h3>
-                            <span class="text-[9px] px-1.5 py-0.5 bg-slate-100 rounded text-slate-500">{meta['pop']}</span>
+                            <span class="text-[9px] px-1.5 py-0.5 bg-rose-50 border border-rose-100 text-rose-600 rounded">{meta['pop']}</span>
                         </div>
-                        <p class="text-[11px] text-slate-500 mt-1 leading-relaxed">{meta['detail']}</p>
+                        <p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">{meta['detail']}</p>
                     </div>
                 </div>
             '''
@@ -422,4 +445,4 @@ def generate_glossary_section():
     '''
 
 if __name__ == '__main__':
-    print("HTML Report Generator optimized with CVD Boundary Melt Detection Visualization.")
+    print("HTML Report Generator optimized with Print Fixes, Coordinate IDs, and Layout Updates.")

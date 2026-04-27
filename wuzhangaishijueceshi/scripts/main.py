@@ -79,12 +79,23 @@ Examples:
             analysis_data = analyze_image_file(args.input)
 
         # =========================================================
-        # 新增：多通道传达启发式规则 (Heuristic Multimodal Check)
+        # 优化：将原始图片转为 Base64 注入数据包，供报告最上方展示
         # =========================================================
+        try:
+            from html_report_generator import image_to_base64
+            from PIL import Image
+            img_path = analysis_data.get('screenshot_path', args.input) if is_url(args.input) else args.input
+            with Image.open(img_path) as img:
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                analysis_data['original_image_base64'] = image_to_base64(img)
+        except Exception as e:
+            print(f"  [Warning] 无法加载原图用于报告展示: {e}")
+
+        # 多通道传达启发式规则
         requires_multimodal = False
         if 'color_analysis' in analysis_data:
             dominant_colors = analysis_data['color_analysis'].get('dominant_colors', [])
-            # 粗略判定是否存在危险的红绿组合 (红: R高且G/B低; 绿: G高且R/B相对低)
             has_red = any(c['rgb'][0] > 180 and c['rgb'][1] < 100 and c['rgb'][2] < 100 for c in dominant_colors)
             has_green = any(c['rgb'][1] > 150 and c['rgb'][0] < 120 for c in dominant_colors)
             if has_red and has_green:
@@ -103,9 +114,7 @@ Examples:
         # Generate HTML report
         generate_html_report(analysis_data, output_path, threshold=args.threshold)
 
-        # =========================================================
-        # 升级：为 Claude LLM 准备的终端高阶数据摘要
-        # =========================================================
+        # 终端数据摘要
         overall_score = calculate_overall_score(analysis_data)
         
         print("\n=== SYSTEM_SUMMARY_FOR_LLM ===")
@@ -121,7 +130,6 @@ Examples:
             print(f"UI_COMPONENT_PASS_RATE: {stats.get('ui_component_pass_rate', 0):.1%}")
             
             pairs = analysis_data['color_analysis'].get('color_pairs', [])
-            # 获取不满足 AA 标准的颜色对 (基于我们在 color_analysis 中更新的 metrics 结构)
             failed_pairs = [p for p in pairs if not p['metrics']['aa_normal']]
             print(f"CONTRAST_ISSUES_FOUND: {len(failed_pairs)}")
             
