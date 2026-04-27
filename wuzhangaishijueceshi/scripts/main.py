@@ -91,53 +91,6 @@ Examples:
                 analysis_data['original_image_base64'] = image_to_base64(img)
         except Exception as e:
             print(f"  [Warning] 无法加载原图用于报告展示: {e}")
-    # =========================================================
-        # 智能组件微观切割审查 (Smart ROI Extraction) - 方案 A 落地
-        # 提取面积适中且长宽比合理的独立 UI 块（如按钮、卡片）
-        # =========================================================
-        try:
-            from skimage import color, filters, measure, morphology
-            import numpy as np
-            
-            img_array = np.array(Image.open(img_path).convert('RGB'))
-            # 1. 灰度化与 Sobel 边缘检测
-            gray = color.rgb2gray(img_array)
-            edges = filters.sobel(gray)
-            
-            # 2. 闭运算：将破碎的边缘连成一个完整的 UI 组件区块
-            closed = morphology.closing(edges > 0.05, morphology.square(5))
-            
-            # 3. 连通域标记与提取
-            labels = measure.label(closed)
-            props = measure.regionprops(labels)
-            
-            rois = []
-            for prop in props:
-                # 过滤条件：面积在 2000px 到 50000px 之间，过滤掉太碎的点或全屏大背景
-                if 2000 < prop.area < 50000:
-                    minr, minc, maxr, maxc = prop.bbox
-                    h, w = maxr - minr, maxc - minc
-                    # 过滤条件：长宽比不能过于极端（比如一条极细的分割线）
-                    if 0.15 < h/w < 6:
-                        # 适当给组件加一点 Padding 以免切得太死
-                        pad = 12
-                        minr, minc = max(0, minr - pad), max(0, minc - pad)
-                        maxr, maxc = min(img_array.shape[0], maxr + pad), min(img_array.shape[1], maxc + pad)
-                        
-                        crop_img = Image.open(img_path).crop((minc, minr, maxc, maxr))
-                        rois.append({
-                            'image_base64': image_to_base64(crop_img, format='JPEG'),
-                            'area': prop.area,
-                            'width': maxc - minc,
-                            'height': maxr - minr
-                        })
-                        
-            # 按面积大小排序，取前 4 个最显著的组件
-            rois.sort(key=lambda x: x['area'], reverse=True)
-            analysis_data['component_rois'] = rois[:4]
-            
-        except Exception as e:
-            print(f"  [Warning] ROI 智能切割失败: {e}")
 
         # 多通道传达启发式规则
         requires_multimodal = False
