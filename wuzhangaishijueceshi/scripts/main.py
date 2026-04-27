@@ -78,6 +78,20 @@ Examples:
         else:
             analysis_data = analyze_image_file(args.input)
 
+        # =========================================================
+        # 新增：多通道传达启发式规则 (Heuristic Multimodal Check)
+        # =========================================================
+        requires_multimodal = False
+        if 'color_analysis' in analysis_data:
+            dominant_colors = analysis_data['color_analysis'].get('dominant_colors', [])
+            # 粗略判定是否存在危险的红绿组合 (红: R高且G/B低; 绿: G高且R/B相对低)
+            has_red = any(c['rgb'][0] > 180 and c['rgb'][1] < 100 and c['rgb'][2] < 100 for c in dominant_colors)
+            has_green = any(c['rgb'][1] > 150 and c['rgb'][0] < 120 for c in dominant_colors)
+            if has_red and has_green:
+                requires_multimodal = True
+        
+        analysis_data['requires_multimodal_check'] = requires_multimodal
+
         # Add metadata
         analysis_data['input_source'] = args.input
         analysis_data['analysis_date'] = datetime.now().isoformat()
@@ -89,27 +103,47 @@ Examples:
         # Generate HTML report
         generate_html_report(analysis_data, output_path, threshold=args.threshold)
 
-        # ---------------------------------------------------------
-        # 新增：专为 Claude LLM 准备的终端数据摘要 (LLM Readout)
-        # ---------------------------------------------------------
+        # =========================================================
+        # 升级：为 Claude LLM 准备的终端高阶数据摘要
+        # =========================================================
         overall_score = calculate_overall_score(analysis_data)
         
         print("\n=== SYSTEM_SUMMARY_FOR_LLM ===")
         print(f"STATUS: SUCCESS")
         print(f"REPORT_PATH: {output_path}")
         print(f"OVERALL_SCORE: {overall_score}/100")
+        print(f"REQUIRES_MULTIMODAL_CHECK: {requires_multimodal}")
         
         if 'color_analysis' in analysis_data:
             stats = analysis_data['color_analysis'].get('statistics', {})
             print(f"AA_COMPLIANCE_RATE: {stats.get('aa_pass_rate', 0):.1%}")
+            print(f"APCA_COMPLIANCE_RATE: {stats.get('apca_pass_rate', 0):.1%}")
+            print(f"UI_COMPONENT_PASS_RATE: {stats.get('ui_component_pass_rate', 0):.1%}")
             
             pairs = analysis_data['color_analysis'].get('color_pairs', [])
-            failed_pairs = [p for p in pairs if p.get('suggestion')]
+            # 获取不满足 AA 标准的颜色对 (基于我们在 color_analysis 中更新的 metrics 结构)
+            failed_pairs = [p for p in pairs if not p['metrics']['aa_normal']]
             print(f"CONTRAST_ISSUES_FOUND: {len(failed_pairs)}")
+            
             if failed_pairs:
-                print(f"TOP_ISSUE: Hex {failed_pairs[0]['color1']['hex']} on {failed_pairs[0]['color2']['hex']} (Ratio {failed_pairs[0]['contrast_ratio']:.2f}:1)")
-                print(f"AUTO_FIX_SUGGESTED: {failed_pairs[0]['suggestion']['hex']}")
+                top_issue = failed_pairs[0]
+                color1 = top_issue['color1']['hex']
+                color2 = top_issue['color2']['hex']
+                ratio = top_issue['metrics']['ratio']
+                apca_lc = top_issue['metrics']['apca_lc']
                 
+                print(f"TOP_ISSUE: Hex {color1} on {color2} (Ratio {ratio:.2f}:1, APCA Lc {apca_lc:.1f})")
+                
+                if top_issue.get('suggestion'):
+                    print(f"AUTO_FIX_SUGGESTED: {top_issue['suggestion']['hex']}")
+                if top_issue.get('safe_palette_suggestion'):
+                    safe_color = top_issue['safe_palette_suggestion']
+                    print(f"SAFE_PALETTE_SUGGESTED: {safe_color['name']} ({safe_color['hex']})")
+                    
+                dark_mode = top_issue.get('dark_mode_eval', {})
+                if dark_mode.get('applicable') and not dark_mode.get('survives_dark_mode'):
+                    print(f"DARK_MODE_WARNING: Fails when inverted to dark background")
+                    
         print("==============================\n")
         
         # 面向用户的常规输出

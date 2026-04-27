@@ -3,18 +3,40 @@
 Color Analysis Module for wuzhangaishijueceshi skill.
 
 This module handles WCAG contrast ratio calculations, color accessibility analysis,
-and smart color correction suggestions.
+APCA (WCAG 3.0) perception modeling, Dark Mode robustness, and smart color correction suggestions.
 """
 
 import numpy as np
 from PIL import Image
-from collections import defaultdict
-import colorsys  # 新增：用于 HSL 和 RGB 之间的转换
+import colorsys
+import math
+
+# ==========================================
+# 权威数据字典：Okabe-Ito 色盲安全调色盘
+# ==========================================
+OKABE_ITO_PALETTE = [
+    {"name": "Black", "hex": "#000000", "rgb": (0, 0, 0)},
+    {"name": "Orange", "hex": "#E69F00", "rgb": (230, 159, 0)},
+    {"name": "Sky Blue", "hex": "#56B4E9", "rgb": (86, 180, 233)},
+    {"name": "Bluish Green", "hex": "#009E73", "rgb": (0, 158, 115)},
+    {"name": "Yellow", "hex": "#F0E442", "rgb": (240, 228, 66)},
+    {"name": "Blue", "hex": "#0072B2", "rgb": (0, 114, 178)},
+    {"name": "Vermilion", "hex": "#D55E00", "rgb": (213, 94, 0)},
+    {"name": "Reddish Purple", "hex": "#CC79A7", "rgb": (204, 121, 167)}
+]
 
 
+def rgb_to_hex(rgb):
+    """Convert RGB tuple to hex string."""
+    return '#{:02x}{:02x}{:02x}'.format(*rgb).upper()
+
+
+# ==========================================
+# WCAG 2.1 古典算法 (相对亮度与对比度比例)
+# ==========================================
 def calculate_relative_luminance(rgb):
     """
-    Calculate relative luminance of an RGB color using WCAG formula.
+    Calculate relative luminance of an RGB color using WCAG 2.1 formula.
     """
     r, g, b = [c / 255.0 for c in rgb]
 
@@ -29,7 +51,7 @@ def calculate_relative_luminance(rgb):
 
 def calculate_contrast_ratio(rgb1, rgb2):
     """
-    Calculate contrast ratio between two RGB colors.
+    Calculate WCAG 2.1 contrast ratio between two RGB colors.
     """
     l1 = calculate_relative_luminance(rgb1)
     l2 = calculate_relative_luminance(rgb2)
@@ -40,69 +62,151 @@ def calculate_contrast_ratio(rgb1, rgb2):
     return (lighter + 0.05) / (darker + 0.05)
 
 
-def check_wcag_compliance(contrast_ratio, is_large_text=False):
+# ==========================================
+# APCA (WCAG 3.0) 现代算法核心
+# ==========================================
+def calculate_apca_contrast(txt_rgb, bg_rgb):
     """
-    Check if contrast ratio meets WCAG standards.
+    计算 APCA (Accessible Perceptual Contrast Algorithm) 的 Lc 值。
+    这个算法对文本在亮底和暗底上的表现做了不对称处理，更贴近人类视觉感知。
+    注意：这里实现的是 APCA 0.0.98G 简化近似版，用于概念验证和诊断。
+    
+    Returns:
+        float: Lightness Contrast (Lc) 值，范围通常在 -108 到 106 之间。
+               正值表示暗字亮底，负值表示亮字暗底。绝对值越大对比度越好。
     """
-    if is_large_text:
-        aa_threshold = 3.0
-        aaa_threshold = 4.5
-    else:
-        aa_threshold = 4.5
-        aaa_threshold = 7.0
+    # 转换为 0-255 空间的线性亮度 (sRGB 简单反色调映射)
+    def to_y(c):
+        c = c / 255.0
+        return math.pow(c, 2.4) if c > 0.022 else c / 12.92
 
+    txt_y = 0.2126 * to_y(txt_rgb[0]) + 0.7152 * to_y(txt_rgb[1]) + 0.0722 * to_y(txt_rgb[2])
+    bg_y  = 0.2126 * to_y(bg_rgb[0])  + 0.7152 * to_y(bg_rgb[1])  + 0.0722 * to_y(bg_rgb[2])
+
+    # APCA 常数 (近似值)
+    norm_bg = 0.56
+    norm_txt = 0.57
+    rev_txt = 0.62
+    rev_bg = 0.65
+    blk_thrs = 0.022
+    blk_clmp = 0.01414
+
+    # 软钳制暗色
+    if txt_y < blk_thrs: txt_y += (blk_thrs - txt_y) ** 1.414
+    if bg_y < blk_thrs: bg_y += (blk_thrs - bg_y) ** 1.414
+
+    # 计算对比度 (SAPCs)
+    if abs(bg_y - txt_y) < 0.0005: return 0.0
+
+    if bg_y > txt_y:
+        # 暗文本在亮背景上
+        sapc = (math.pow(bg_y, norm_bg) - math.pow(txt_y, norm_txt)) * 1.14
+        return sapc * 100 if sapc > 0.1 else 0.0
+    else:
+        # 亮文本在暗背景上
+        sapc = (math.pow(bg_y, rev_bg) - math.pow(txt_y, rev_txt)) * 1.14
+        return sapc * 100 if sapc < -0.1 else 0.0
+
+
+# ==========================================
+# 综合合规性校验引擎
+# ==========================================
+def check_comprehensive_compliance(rgb1, rgb2):
+    """
+    进行全面的合规性校验，包括 WCAG 2.1 (文本与非文本) 和 APCA。
+    """
+    contrast = calculate_contrast_ratio(rgb1, rgb2)
+    # APCA 结果，取绝对值以便后续评估
+    apca_lc = abs(calculate_apca_contrast(rgb1, rgb2))
+    
     return {
-        'aa': contrast_ratio >= aa_threshold,
-        'aaa': contrast_ratio >= aaa_threshold,
-        'aa_threshold': aa_threshold,
-        'aaa_threshold': aaa_threshold,
-        'meets_minimum': contrast_ratio >= 3.0 
+        # WCAG 2.1 经典指标
+        'ratio': contrast,
+        'aa_normal': contrast >= 4.5,
+        'aaa_normal': contrast >= 7.0,
+        'aa_large': contrast >= 3.0,
+        'aaa_large': contrast >= 4.5,
+        'ui_component': contrast >= 3.0,  # 新增：非文本 UI 控件标准 (WCAG 1.4.11)
+        
+        # APCA 指标 (WCAG 3.0 候选)
+        'apca_lc': apca_lc,
+        'apca_pass_normal': apca_lc >= 60,  # Lc 60 是普通文本的推荐基线
+        'apca_pass_large': apca_lc >= 45    # Lc 45 适合大文本
     }
 
 
-def rgb_to_hex(rgb):
-    """Convert RGB tuple to hex string."""
-    return '#{:02x}{:02x}{:02x}'.format(*rgb)
+# ==========================================
+# 深色模式翻转鲁棒性评估
+# ==========================================
+def test_dark_mode_robustness(fg_rgb, bg_rgb):
+    """
+    测试这对颜色在深色模式下的表现。
+    如果背景色较亮，我们将其“翻转”为一个深色背景（如深灰 #1E1E1E），
+    然后测试前景文本在这个新深底上的对比度，看是否会“糊掉”。
+    """
+    l_bg = calculate_relative_luminance(bg_rgb)
+    
+    # 如果原本就是深色背景，就不做深色模式翻转测试了
+    if l_bg < 0.2:
+        return {'applicable': False}
+        
+    # 模拟标准的深色背景 (约 #1E1E1E)
+    simulated_dark_bg = (30, 30, 30)
+    
+    # 测试原前景色在深色背景上的表现
+    robust_contrast = calculate_contrast_ratio(fg_rgb, simulated_dark_bg)
+    
+    return {
+        'applicable': True,
+        'simulated_bg_hex': rgb_to_hex(simulated_dark_bg),
+        'contrast_on_dark': robust_contrast,
+        'survives_dark_mode': robust_contrast >= 4.5
+    }
+
+
+# ==========================================
+# 智能修复工单算法
+# ==========================================
+def find_nearest_okabe_ito_color(target_rgb, bg_rgb, min_ratio=4.5):
+    """
+    在 Okabe-Ito 色盲安全库中，寻找在背景上合规且色彩空间距离最近的安全色。
+    """
+    best_color = None
+    min_dist = float('inf')
+    
+    for safe_color in OKABE_ITO_PALETTE:
+        safe_rgb = safe_color['rgb']
+        if calculate_contrast_ratio(safe_rgb, bg_rgb) >= min_ratio:
+            # 简单的欧氏距离比较 (在 RGB 空间粗略估计颜色差异)
+            dist = math.sqrt(sum((c1 - c2) ** 2 for c1, c2 in zip(target_rgb, safe_rgb)))
+            if dist < min_dist:
+                min_dist = dist
+                best_color = safe_color
+                
+    return best_color
 
 
 def suggest_compliant_color(adjustable_rgb, fixed_rgb, target_ratio=4.5):
     """
-    【核心算法】智能色值推算：
-    通过在 HSL 色彩空间使用二分查找法微调亮度 (Lightness)，
-    计算出在保持色相和饱和度不变的前提下，能满足目标对比度的最接近颜色。
-
-    Args:
-        adjustable_rgb: 需要被调整的前景颜色 (R, G, B)
-        fixed_rgb: 固定的背景颜色 (R, G, B)
-        target_ratio: 目标对比度 (如 AA 标准为 4.5)
-
-    Returns:
-        tuple: 修正后的 (R, G, B) 颜色
+    使用二分查找法在 HSL 色彩空间微调亮度，推算出满足对比度的最接近颜色。
     """
     current_ratio = calculate_contrast_ratio(adjustable_rgb, fixed_rgb)
     if current_ratio >= target_ratio:
         return adjustable_rgb
 
-    # 将 RGB (0-255) 转换为 HLS (0.0-1.0)
     r, g, b = [c / 255.0 for c in adjustable_rgb]
     h, l, s = colorsys.rgb_to_hls(r, g, b)
 
     l_adj = calculate_relative_luminance(adjustable_rgb)
     l_fixed = calculate_relative_luminance(fixed_rgb)
 
-    # 判断调整方向：
-    # 如果待调颜色比背景亮，说明需要让它更亮才能拉开对比度；
-    # 如果待调颜色比背景暗，说明需要让它更暗。
     if l_adj > l_fixed or (l_adj == l_fixed and l_fixed < 0.5):
-        low_l, high_l = l, 1.0  # 变亮区间
-        make_lighter = True
+        low_l, high_l, make_lighter = l, 1.0, True
     else:
-        low_l, high_l = 0.0, l  # 变暗区间
-        make_lighter = False
+        low_l, high_l, make_lighter = 0.0, l, False
 
     best_rgb = adjustable_rgb
     
-    # 执行二分查找 (10次迭代足以在 0-255 范围内找到精确值)
     for _ in range(10):
         mid_l = (low_l + high_l) / 2
         new_r, new_g, new_b = colorsys.hls_to_rgb(h, mid_l, s)
@@ -112,35 +216,27 @@ def suggest_compliant_color(adjustable_rgb, fixed_rgb, target_ratio=4.5):
 
         if ratio >= target_ratio:
             best_rgb = test_rgb
-            # 已经及格了，尝试向原始颜色稍微靠拢一点（寻找及格线边缘的最优解）
-            if make_lighter:
-                high_l = mid_l
-            else:
-                low_l = mid_l
+            if make_lighter: high_l = mid_l
+            else: low_l = mid_l
         else:
-            # 还不及格，继续往极端方向走
-            if make_lighter:
-                low_l = mid_l
-            else:
-                high_l = mid_l
+            if make_lighter: low_l = mid_l
+            else: high_l = mid_l
 
-    # 最终的安全验证 (Edge Case fallback)
-    # 有些极端颜色（比如中度灰背景），可能怎么调也达不到 7.0:1 的对比度
-    # 此时直接退化为极端的纯白或纯黑
+    # Fallback to white/black if impossible
     final_ratio = calculate_contrast_ratio(best_rgb, fixed_rgb)
     if final_ratio < target_ratio:
-        white_ratio = calculate_contrast_ratio((255, 255, 255), fixed_rgb)
-        black_ratio = calculate_contrast_ratio((0, 0, 0), fixed_rgb)
-        if white_ratio >= target_ratio:
-            return (255, 255, 255)
-        elif black_ratio >= target_ratio:
-            return (0, 0, 0)
-        else:
-            return (255, 255, 255) if white_ratio > black_ratio else (0, 0, 0)
+        w_ratio = calculate_contrast_ratio((255, 255, 255), fixed_rgb)
+        b_ratio = calculate_contrast_ratio((0, 0, 0), fixed_rgb)
+        if w_ratio >= target_ratio: return (255, 255, 255)
+        elif b_ratio >= target_ratio: return (0, 0, 0)
+        return (255, 255, 255) if w_ratio > b_ratio else (0, 0, 0)
 
     return best_rgb
 
 
+# ==========================================
+# 图像处理与流程管线
+# ==========================================
 def extract_dominant_colors(image, num_colors=15):
     """Extract dominant colors from an image using K-means clustering."""
     if isinstance(image, Image.Image):
@@ -182,7 +278,7 @@ def extract_dominant_colors(image, num_colors=15):
 
 def analyze_color_pairs(dominant_colors):
     """
-    Analyze all pairs of dominant colors and provide smart suggestions if they fail WCAG.
+    Analyze all pairs of dominant colors and provide comprehensive data.
     """
     pairs = []
 
@@ -191,31 +287,37 @@ def analyze_color_pairs(dominant_colors):
             if i >= j:  
                 continue
 
-            contrast = calculate_contrast_ratio(color1['rgb'], color2['rgb'])
-            compliance = check_wcag_compliance(contrast)
+            # 假设 color2 (频率更高或者在下层) 是背景
+            compliance_data = check_comprehensive_compliance(color1['rgb'], color2['rgb'])
+            dark_mode_data = test_dark_mode_robustness(color1['rgb'], color2['rgb'])
             
             pair_data = {
                 'color1': color1,
                 'color2': color2,
-                'contrast_ratio': contrast,
-                'compliance': compliance,
-                'wcag_level': 'AAA' if compliance['aaa'] else 'AA' if compliance['aa'] else 'Fail',
-                'suggestion': None
+                'metrics': compliance_data,
+                'dark_mode_eval': dark_mode_data,
+                'suggestion': None,
+                'safe_palette_suggestion': None
             }
 
-            # 如果不满足 AA 级别，则触发智能推算算法
-            if not compliance['aa']:
-                # 假设 color2 是底色，推算 color1 的合规色值
+            # 如果不满足 AA 级别，提供智能修复方案
+            if not compliance_data['aa_normal']:
+                # 方案 1: 算法微调亮度
                 suggested_rgb = suggest_compliant_color(color1['rgb'], color2['rgb'], 4.5)
                 pair_data['suggestion'] = {
                     'hex': rgb_to_hex(suggested_rgb),
-                    'rgb': suggested_rgb,
-                    'target_ratio': 4.5
+                    'rgb': suggested_rgb
                 }
+                
+                # 方案 2: 推荐 Okabe-Ito 安全分类色
+                safe_color = find_nearest_okabe_ito_color(color1['rgb'], color2['rgb'], 4.5)
+                if safe_color:
+                    pair_data['safe_palette_suggestion'] = safe_color
 
             pairs.append(pair_data)
 
-    pairs.sort(key=lambda x: x['contrast_ratio'])
+    # 按照 WCAG 比例从小到大排序 (问题最严重的放前面)
+    pairs.sort(key=lambda x: x['metrics']['ratio'])
     return pairs
 
 
@@ -226,8 +328,10 @@ def analyze_image_colors(image_path, num_colors=15):
     color_pairs = analyze_color_pairs(dominant_colors)
 
     total_pairs = len(color_pairs)
-    aa_pass = sum(1 for p in color_pairs if p['compliance']['aa'])
-    aaa_pass = sum(1 for p in color_pairs if p['compliance']['aaa'])
+    aa_pass = sum(1 for p in color_pairs if p['metrics']['aa_normal'])
+    aaa_pass = sum(1 for p in color_pairs if p['metrics']['aaa_normal'])
+    apca_pass = sum(1 for p in color_pairs if p['metrics']['apca_pass_normal'])
+    ui_component_pass = sum(1 for p in color_pairs if p['metrics']['ui_component'])
 
     return {
         'dominant_colors': dominant_colors,
@@ -237,7 +341,11 @@ def analyze_image_colors(image_path, num_colors=15):
             'aa_pass': aa_pass,
             'aaa_pass': aaa_pass,
             'aa_pass_rate': aa_pass / total_pairs if total_pairs > 0 else 0,
-            'aaa_pass_rate': aaa_pass / total_pairs if total_pairs > 0 else 0
+            'aaa_pass_rate': aaa_pass / total_pairs if total_pairs > 0 else 0,
+            
+            # 新增统计维度
+            'apca_pass_rate': apca_pass / total_pairs if total_pairs > 0 else 0,
+            'ui_component_pass_rate': ui_component_pass / total_pairs if total_pairs > 0 else 0
         }
     }
 
@@ -281,13 +389,16 @@ if __name__ == '__main__':
 
     print(f"Analysis complete!")
     print(f"Dominant colors found: {len(result['dominant_colors'])}")
-    print(f"AA compliance: {result['statistics']['aa_pass_rate']:.1%}")
+    print(f"WCAG AA compliance: {result['statistics']['aa_pass_rate']:.1%}")
+    print(f"APCA compliance (Lc >= 60): {result['statistics']['apca_pass_rate']:.1%}")
     
-    print("\nTop 5 most problematic color pairs (lowest contrast):")
-    for i, pair in enumerate(result['color_pairs'][:5], 1):
-        suggestion_text = ""
+    print("\nTop 3 most problematic color pairs:")
+    for i, pair in enumerate(result['color_pairs'][:3], 1):
+        print(f"  {i}. {pair['color1']['hex']} ↔ {pair['color2']['hex']}")
+        print(f"     - WCAG Ratio: {pair['metrics']['ratio']:.2f}:1")
+        print(f"     - APCA Lc: {pair['metrics']['apca_lc']:.1f}")
+        
         if pair['suggestion']:
-            suggestion_text = f" -> Suggest modifying {pair['color1']['hex']} to {pair['suggestion']['hex']}"
-            
-        print(f"  {i}. {pair['color1']['hex']} ↔ {pair['color2']['hex']}: "
-              f"{pair['contrast_ratio']:.2f}:1 ({pair['wcag_level']}){suggestion_text}")
+            print(f"     💡 HSL Auto-Fix: Change fg to {pair['suggestion']['hex']}")
+        if pair['safe_palette_suggestion']:
+            print(f"     🎨 Okabe-Ito Safe Color: Use {pair['safe_palette_suggestion']['name']} ({pair['safe_palette_suggestion']['hex']})")

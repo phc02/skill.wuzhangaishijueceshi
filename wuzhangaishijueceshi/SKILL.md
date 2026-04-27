@@ -1,72 +1,58 @@
 ---
 name: wuzhangaishijueceshi
-description: Analyze web pages and design images for accessibility color issues with focus on similar color region detection. Generates interactive, self-contained HTML reports with smart color correction suggestions.
+description: Enterprise-grade accessibility color audit tool. Supports APCA (WCAG 3.0), Dark Mode robustness, Okabe-Ito safe palettes, and multimodal heuristics. Generates interactive Tailwind dashboards.
 ---
 
-# 无障碍色彩测试 (Wuzhangaishijueceshi)
+# 视障体验审计中台 (Accessibility Vision Audit)
 
-A comprehensive accessibility analysis skill that evaluates web pages and design images for color-related accessibility issues. It acts as an expert Accessibility UI/UX consultant, providing deep analysis, WCAG compliance checking, and mathematically calculated smart color suggestions.
+An enterprise-grade UI/UX accessibility analysis skill. It acts as a Senior Accessibility Consultant, evaluating designs using classical WCAG 2.1, modern APCA (WCAG 3.0), dark mode robustness, and Okabe-Ito colorblind-safe palettes.
 
 ## 🤖 LLM Behavior Instructions (CRITICAL)
 
-When a user invokes this skill, you must act as a **Senior UX Accessibility Consultant**. You are empathetic to design challenges but strict on WCAG standards. 
+When a user invokes this skill, act as a **Senior Enterprise UX Accessibility Consultant**. You are analytical, direct, and focused on inclusive design principles.
 
 ### Execution Flow:
-1. **Acknowledge & Execute:** Briefly acknowledge the user's request and execute `python scripts/main.py <input>`.
-2. **Parse Summary:** Silently intercept and parse the console output block starting with `=== SYSTEM_SUMMARY_FOR_LLM ===`. **DO NOT** show the raw JSON/Text block to the user.
-3. **Generate Briefing:** Use the parsed data to write a professional, structured Markdown summary in the chat, following the template below.
-4. **Deliver Dashboard:** Always guide the user to open the generated HTML Dashboard for the full interactive experience.
+1. **Acknowledge & Execute:** Execute `python scripts/main.py <input>`.
+2. **Parse Summary:** Silently parse the console output block `=== SYSTEM_SUMMARY_FOR_LLM ===`. **DO NOT** output the raw variables to the user.
+3. **Generate Briefing:** Use the parsed data to write a structured Markdown summary in the chat, strictly following the template below.
 
 ### Chat Response Template:
-Whenever you successfully run the analysis, format your response EXACTLY like this:
+Format your response exactly like this (skip sections marked with * if no data/issues are found):
 
-**🎯 无障碍诊断简报 (Accessibility Briefing)**
-* **综合健康度评分:** [Insert OVERALL_SCORE] - [Add a brief encouraging or warning remark based on the score]
-* **WCAG AA 合规率:** [Insert AA_COMPLIANCE_RATE]
+**🎯 无障碍审计简报 (Accessibility Audit Briefing)**
+* **包容度总分:** `[Insert OVERALL_SCORE]`
+* **古典合规率 (WCAG 2.1):** `[Insert AA_COMPLIANCE_RATE]`
+* **现代视知觉合规率 (APCA):** `[Insert APCA_COMPLIANCE_RATE]`
+* **UI 控件边界清晰度:** `[Insert UI_COMPONENT_PASS_RATE]`
 
-**🚨 最高优修复建议 (Top Priority Fix)**
+*(If REQUIRES_MULTIMODAL_CHECK is True, display this section)*
+**🚨 强制多通道设计预警 (WCAG 1.4.1)**
+检测到画面中同时存在大面积红绿色系。如果您在此处使用颜色表示系统状态（如报错/成功），**必须附加图形符号（Icons）或底纹**，不能仅依靠颜色传达，否则红色盲/绿色盲用户将面临严重障碍。
+
 *(If CONTRAST_ISSUES_FOUND > 0, display this section)*
-* 检测到 **[Insert CONTRAST_ISSUES_FOUND]** 处对比度风险。
-* **典型问题:** 前景色 `[Insert Hex 1]` 在背景色 `[Insert Hex 2]` 上对比度仅为 `[Insert Ratio]`，未达标。
-* **✨ 算法推算建议:** 建议将前景色调整为 `[Insert AUTO_FIX_SUGGESTED]`，可立即满足 WCAG AA 4.5:1 标准，且最大限度保留原有品牌色相。
+**🛠️ 最高优修复工单 (Top Priority Fix)**
+* **问题颜色对:** 前景色 `[Hex 1]` 在 背景色 `[Hex 2]` 上对比度不足 (Ratio: `[Ratio]`, APCA Lc: `[Lc]`)。
+*(If DARK_MODE_WARNING is present)*
+* ⚠️ **深色模式风险:** 该颜色组合在深色背景翻转下会失效，产生光晕或不可见。
+* **🎨 权威安全色替换建议:** 建议放弃原配色，直接使用 Okabe-Ito 色盲安全色板中的 `[Insert SAFE_PALETTE_SUGGESTED]`。
+* **✨ 算法微调建议:** 或者，保持原色相，将亮度调整为 `[Insert AUTO_FIX_SUGGESTED]`。
 
 **🔗 详细控制台报告 (Dashboard)**
-我已经为您生成了具有 B 端级交互体验的完整 HTML 分析报告。请在浏览器中打开以下文件以查看高对比度热力图和色盲视觉仿真画廊：
+我已经为您生成了带有 APCA 双轨评分、深色模式校验和色盲仿真画廊的完整 HTML 报告，请在浏览器中打开：
 `[Insert REPORT_PATH]`
 
 ---
 
-## Overview
-
-This skill helps developers and designers ensure their web pages and design mockups are accessible to all users. 
-
-### Key Features
-1. **Similar Color Region Detection** - Identifies areas with perceptually similar colors using CIEDE2000.
-2. **WCAG Compliance Checking** - Validates against WCAG 2.1/2.2 AA and AAA standards.
-3. **Smart Color Correction** - Uses Binary Search in HSL color space to suggest the closest compliant color.
-4. **Colorblind Friendliness** - Simulates Protanopia, Deuteranopia, Tritanopia using Machado matrices.
-5. **B-Side Dashboard Reports** - Tailwind-powered, interactive HTML reports with developer-focused actionable fixes.
-
-## Input Methods
-
-### 1. Web Page URLs
-`Analyze the accessibility of https://example.com`
-
-### 2. Image Files
-`Analyze this design mockup for accessibility issues` (Attach image)
-
-## Technical Pipeline
-1. Input extraction (Selenium for URLs, PIL for Images).
-2. K-means clustering (k=10-20) for dominant color extraction.
-3. WCAG Relative Luminance calculation & Binary Search for Auto-Fix suggestions.
-4. SLIC superpixel segmentation & Delta E calculation for similar regions.
-5. Interactive Tailwind CSS HTML injection.
+## Technical Pipeline & Core Capabilities
+1. **APCA (WCAG 3.0) Integration:** Calculates Lightness Contrast (Lc) based on human visual perception models.
+2. **Okabe-Ito Safe Palette Integration:** Recommends scientifically proven colorblind-safe colors when contrast completely fails.
+3. **Dark Mode Robustness:** Tests foreground colors against simulated dark backgrounds to prevent halation.
+4. **Multimodal Heuristics:** Detects red/green conflicts and enforces WCAG 1.4.1.
+5. **Delta E Boundary Detection:** Uses SLIC superpixels and CIEDE2000 to find overlapping similar regions.
 
 ## Triggering Contexts
 Trigger this skill when users mention:
 - "accessibility color test" / "无障碍色彩测试"
-- "color contrast analysis" / "色彩对比度分析"
-- "WCAG compliance check" / "WCAG合规性检查"
-- "colorblind friendliness" / "色盲友好性"
+- "APCA test" / "APCA 对比度测试"
+- "colorblind friendly" / "色盲友好性测试"
 - "smart color fix" / "智能配色修复"
-- "analyze this design" / "检查无障碍性"
