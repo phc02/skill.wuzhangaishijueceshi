@@ -2,8 +2,7 @@
 """
 Similar Color Region Detector for wuzhangaishijueceshi skill.
 
-UPGRADED: Includes "CVD Boundary Melt Detection". It detects regions that 
-look distinct to normal vision but melt together for colorblind users.
+UPGRADED: Includes "CVD Boundary Melt Detection" and forced coordinate bounding boxes.
 Uses CIEDE2000 color difference metric for perceptually accurate color comparison.
 """
 
@@ -18,9 +17,6 @@ from colormath.color_diff import delta_e_cie2000
 if not hasattr(np, 'asscalar'):
     np.asscalar = lambda a: a.item()
 
-# ==========================================
-# Machado 色觉障碍 (CVD) 仿真矩阵
-# ==========================================
 CVD_MATRICES = {
     'Protanopia (红色盲)': [[0.567, 0.433, 0.000], [0.558, 0.442, 0.000], [0.000, 0.242, 0.758]],
     'Deuteranopia (绿色盲)': [[0.625, 0.375, 0.000], [0.700, 0.300, 0.000], [0.000, 0.300, 0.700]],
@@ -28,26 +24,19 @@ CVD_MATRICES = {
 }
 
 def rgb_to_lab(rgb_array):
-    """Convert RGB image array to Lab color space."""
     rgb_normalized = rgb_array.astype(np.float32) / 255.0
     return rgb2lab(rgb_normalized)
 
 def calculate_region_colors(lab_image, rgb_image, segments, region_id):
-    """
-    同时计算该区域的 Lab 平均值和 RGB 平均值，
-    RGB 值将用于后续的色盲仿真矩阵运算。
-    """
     mask = segments == region_id
     if not np.any(mask):
         return None, None
 
-    # 获取 Lab 平均值
     lab_pixels = lab_image[mask]
     avg_l = np.mean(lab_pixels[:, 0])
     avg_a = np.mean(lab_pixels[:, 1])
     avg_b = np.mean(lab_pixels[:, 2])
 
-    # 获取 RGB 平均值
     rgb_pixels = rgb_image[mask]
     avg_r = np.mean(rgb_pixels[:, 0])
     avg_g = np.mean(rgb_pixels[:, 1])
@@ -56,7 +45,6 @@ def calculate_region_colors(lab_image, rgb_image, segments, region_id):
     return (avg_l, avg_a, avg_b), (avg_r, avg_g, avg_b)
 
 def get_adjacent_regions(segments, region_id):
-    """Get IDs of regions adjacent to the specified region."""
     mask = segments == region_id
     if not np.any(mask):
         return set()
@@ -68,7 +56,6 @@ def get_adjacent_regions(segments, region_id):
     return adjacent_ids
 
 def ciede2000(color1, color2):
-    """Calculate CIEDE2000 color difference between two Lab colors."""
     lab1 = LabColor(color1[0], color1[1], color1[2])
     lab2 = LabColor(color2[0], color2[1], color2[2])
     result = delta_e_cie2000(lab1, lab2)
@@ -78,22 +65,31 @@ def ciede2000(color1, color2):
     else: return float(result)
 
 def simulate_cvd_lab(rgb_tuple, matrix):
-    """将普通 RGB 颜色应用色盲矩阵后，转为 Lab 色彩空间供 ΔE 计算。"""
     r, g, b = rgb_tuple
     sim_r = min(255, max(0, matrix[0][0] * r + matrix[0][1] * g + matrix[0][2] * b))
     sim_g = min(255, max(0, matrix[1][0] * r + matrix[1][1] * g + matrix[1][2] * b))
     sim_b = min(255, max(0, matrix[2][0] * r + matrix[2][1] * g + matrix[2][2] * b))
     
-    # 构造单像素图像以复用 skimage 的 rgb2lab
     sim_array = np.array([[[sim_r, sim_g, sim_b]]], dtype=np.uint8)
     sim_lab = rgb_to_lab(sim_array)[0, 0]
     return (sim_lab[0], sim_lab[1], sim_lab[2])
 
+def get_region_boundaries(segments, region_id):
+    """提取区域的物理边界与中心坐标"""
+    mask = segments == region_id
+    if not np.any(mask): return None
+
+    rows, cols = np.where(mask)
+    bbox = {
+        'y_min': int(rows.min()), 'y_max': int(rows.max()),
+        'x_min': int(cols.min()), 'x_max': int(cols.max())
+    }
+    bbox['center_x'] = (bbox['x_min'] + bbox['x_max']) // 2
+    bbox['center_y'] = (bbox['y_min'] + bbox['y_max']) // 2
+    bbox['area'] = int(np.sum(mask))
+    return bbox
 
 def analyze_similar_colors(image, threshold=5.0, n_segments=100):
-    """
-    Analyze similar color regions and perform CVD Boundary Melt Detection.
-    """
     if isinstance(image, Image.Image):
         image_array = np.array(image)
     else:
@@ -135,28 +131,21 @@ def analyze_similar_colors(image, threshold=5.0, n_segments=100):
                 lab1, lab2 = region_lab_colors[region_id], region_lab_colors[neighbor_id]
                 rgb1, rgb2 = region_rgb_colors[region_id], region_rgb_colors[neighbor_id]
 
-                # 1. 计算正常视力下的色差
                 normal_delta_e = ciede2000(lab1, lab2)
-                
                 melt_risks = []
                 worst_cvd_delta_e = normal_delta_e
 
-                # 2. 核心绝杀：遍历 3 种色觉障碍，进行边缘消融检测
                 for cvd_name, matrix in CVD_MATRICES.items():
                     cvd_lab1 = simulate_cvd_lab(rgb1, matrix)
                     cvd_lab2 = simulate_cvd_lab(rgb2, matrix)
                     cvd_delta_e = ciede2000(cvd_lab1, cvd_lab2)
                     
-                    # 记录最差的情况
                     if cvd_delta_e < worst_cvd_delta_e:
                         worst_cvd_delta_e = cvd_delta_e
                         
-                    # 边缘消融判定规则：正常人看边界清晰 (ΔE >= 3)，但色盲看着模糊 (ΔE < 3)
-                    # 或者本身对正常人就模糊，但色盲看着更灾难 (ΔE < 2.0)
                     if cvd_delta_e < 3.0 and (normal_delta_e >= 3.0 or cvd_delta_e < normal_delta_e - 1.0):
                         melt_risks.append(cvd_name)
 
-                # 3. 拦截问题：正常视觉色差小，或者触发了色盲边缘消融
                 if normal_delta_e < threshold or melt_risks:
                     similar_regions.append({
                         'region1': int(region_id),
@@ -168,8 +157,17 @@ def analyze_similar_colors(image, threshold=5.0, n_segments=100):
                         'color2': lab2
                     })
 
-    # 根据最严重的边缘消融（或正常色差）进行排序
     similar_regions.sort(key=lambda x: min(x['delta_e'], x['worst_cvd_delta_e']))
+
+    # ========================================================
+    # 核心修复：强制在基础分析函数中注入边界坐标
+    # ========================================================
+    for issue in similar_regions:
+        for region_key in ['region1', 'region2']:
+            region_id = issue[region_key]
+            boundaries = get_region_boundaries(segments, region_id)
+            if boundaries:
+                issue[f'{region_key}_boundaries'] = boundaries
 
     return {
         'similar_regions': similar_regions,
@@ -192,7 +190,6 @@ def generate_similarity_heatmap(image, analysis_result):
         region1_mask = segments == issue['region1']
         region2_mask = segments == issue['region2']
 
-        # 使用最差的 Delta E (可能是色盲视图下的) 来渲染热力图严重程度
         effective_delta = min(issue['delta_e'], issue['worst_cvd_delta_e'])
         intensity = max(0, 1 - (effective_delta / analysis_result['threshold']))
         
@@ -206,32 +203,9 @@ def generate_similarity_heatmap(image, analysis_result):
 
     return heatmap
 
-def get_region_boundaries(segments, region_id):
-    mask = segments == region_id
-    if not np.any(mask): return None
-
-    rows, cols = np.where(mask)
-    bbox = {
-        'y_min': int(rows.min()), 'y_max': int(rows.max()),
-        'x_min': int(cols.min()), 'x_max': int(cols.max())
-    }
-    bbox['center_x'] = (bbox['x_min'] + bbox['x_max']) // 2
-    bbox['center_y'] = (bbox['y_min'] + bbox['y_max']) // 2
-    bbox['area'] = int(np.sum(mask))
-
-    return bbox
-
 def analyze_image_for_similar_colors(image_path, threshold=5.0):
     image = Image.open(image_path)
     analysis_result = analyze_similar_colors(image, threshold=threshold)
-
-    for issue in analysis_result['similar_regions']:
-        for region_key in ['region1', 'region2']:
-            region_id = issue[region_key]
-            boundaries = get_region_boundaries(analysis_result['segments'], region_id)
-            if boundaries:
-                issue[f'{region_key}_boundaries'] = boundaries
-
     analysis_result['heatmap'] = generate_similarity_heatmap(image, analysis_result)
     return analysis_result
 
