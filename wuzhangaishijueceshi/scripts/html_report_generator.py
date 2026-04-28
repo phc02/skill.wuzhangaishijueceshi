@@ -3,7 +3,7 @@
 HTML Report Generator for wuzhangaishijueceshi skill.
 
 Optimized for: Explanatory Tooltips for all professional terms, 
-Data Source Traceability in Summary, and Printability.
+Data Source Traceability in Summary, Printability, and Edge Case UI Fallback.
 """
 
 import base64
@@ -128,9 +128,6 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12" role="main">
 '''
 
-    # ========================================================
-    # 优化 1：系统包容性分析概览 - 加上完备的 Tooltip
-    # ========================================================
     html_content += f'''
         <section id="overview" aria-label="诊断概览">
             <div class="mb-6 text-center">
@@ -184,9 +181,9 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
     if 'similar_regions' in analysis_data:
         html_content += generate_similar_regions_section(analysis_data)
 
+    # 包含极端状态兜底逻辑的修复工单模块
     html_content += generate_recommendations_section(analysis_data)
 
-    # 优化 2：带数据来源说明的终结结论
     html_content += generate_summary_section(overall_score, apca_rate, analysis_data)
 
     html_content += generate_glossary_section()
@@ -268,7 +265,6 @@ def generate_contrast_section(color_analysis):
                 <thead class="bg-slate-50/50">
                     <tr>
                         <th class="px-6 py-3 text-left text-[10px] font-bold text-slate-400 uppercase">交叉颜色对 (前景/背景)</th>
-                        
                         <th class="px-6 py-3 text-center text-[10px] font-bold text-slate-400 uppercase">
                             <div class="flex items-center justify-center gap-1">
                                 WCAG 2.1
@@ -351,6 +347,9 @@ def generate_similar_regions_section(analysis_data):
     html += '</div></section>'
     return html
 
+# ========================================================
+# 核心修复：工单渲染加入极端冲突（无解）时的兜底 UI
+# ========================================================
 def generate_recommendations_section(analysis_data):
     html = '''
         <section class="bg-slate-900 rounded-xl shadow-xl no-print">
@@ -362,17 +361,37 @@ def generate_recommendations_section(analysis_data):
     '''
     pairs = analysis_data.get('color_analysis', {}).get('color_pairs', [])
     failed_pairs = [p for p in pairs if not p['metrics']['aa_normal']]
+    
     for idx, pair in enumerate(failed_pairs[:6]):
         orig_c, bg_c = pair['color1']['hex'], pair['color2']['hex']
+        ratio = pair['metrics'].get('ratio', 0)
+        
+        diag = "对比度极度匮乏，导致文本/图标在背景上几乎隐形。" if ratio < 2.0 else "对比度处于危险边缘，低视力用户在户外阳光下无法阅读。"
+
         html += f'''
             <div class="border border-slate-700 rounded-lg p-5 bg-slate-800/40 flex flex-col justify-between">
-                <div><span class="text-[10px] font-black text-rose-400 uppercase mb-2 block">修复工单 #{idx+1}</span>
-                <p class="text-[11px] text-slate-300 leading-relaxed mb-4">前景色 <span class="text-rose-300 font-mono">{orig_c}</span> 在底色 <span class="text-slate-500 font-mono">{bg_c}</span> 上不达标。</p></div>
+                <div>
+                    <span class="text-[10px] font-black text-rose-400 uppercase mb-2 block">修复工单 #{idx+1}</span>
+                    <p class="text-[11px] text-slate-300 leading-relaxed mb-4">前景色 <span class="text-rose-300 font-mono">{orig_c}</span> 在底色 <span class="text-slate-500 font-mono">{bg_c}</span> 上不达标。<br><span class="text-slate-400 mt-1 block"><b>深度诊断：</b>{diag}</span></p>
+                </div>
         '''
+        
+        # 兜底逻辑：如果 safe_palette_suggestion 有值
         if pair.get('safe_palette_suggestion'):
             safe = pair['safe_palette_suggestion']
-            html += f'''<div class="bg-slate-800 p-3 rounded border border-slate-700 mt-2"><p class="text-[9px] text-indigo-400 font-bold uppercase mb-2">🏆 首选方案</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded shadow-inner" style="background-color: {safe['hex']}"></div><div><div class="text-[11px] font-bold text-white">{safe['name']}</div><div class="text-[10px] font-mono text-emerald-400">{safe['hex']}</div></div></div></div>'''
+            html += f'''<div class="bg-slate-800 p-3 rounded border border-slate-700 mt-2"><p class="text-[9px] text-indigo-400 font-bold uppercase mb-2">🏆 首选：色盲安全色</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded shadow-inner" style="background-color: {safe['hex']}"></div><div><div class="text-[11px] font-bold text-white">{safe['name']}</div><div class="text-[10px] font-mono text-emerald-400">{safe['hex']}</div></div></div></div>'''
+        
+        # 否则：如果 suggestion (微调算法) 成功出结果
+        elif pair.get('suggestion') and pair.get('suggestion', {}).get('hex'):
+            auto_c = pair['suggestion']['hex']
+            html += f'''<div class="bg-slate-800 p-3 rounded border border-slate-700 mt-2"><p class="text-[9px] text-slate-400 font-bold uppercase mb-2">备选：明度微调色</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded shadow-inner" style="background-color: {auto_c}"></div><div class="text-[10px] font-mono text-indigo-400">{auto_c}</div></div></div>'''
+        
+        # 最后兜底：两种算法全部失败，给出极端冲突警告
+        else:
+            html += f'''<div class="bg-rose-900/20 p-3 rounded border border-rose-800/50 mt-2"><p class="text-[9px] text-rose-400 font-bold uppercase mb-2">⚠️ 极端色彩冲突</p><p class="text-[10px] text-slate-400 leading-relaxed">由于两色明度过于接近，算法无法在维持原色调的前提下修复。建议彻底改用纯白 <b class="text-white font-mono">#FFFFFF</b> 或纯黑 <b class="text-white font-mono">#000000</b> 作为文字前景色。</p></div>'''
+            
         html += '</div>'
+        
     if not failed_pairs:
         html += '<div class="text-emerald-400 text-sm">🎉 完美！色彩对比度全线通过测试，无需修复。</div>'
     html += '</div></section>'
@@ -404,7 +423,6 @@ def generate_summary_section(score, apca, analysis_data):
     issues_count = len(analysis_data.get('similar_regions', {}).get('similar_regions', []))
     pairs_count = len([p for p in analysis_data.get('color_analysis', {}).get('color_pairs', []) if not p['metrics'].get('aa_normal')])
     
-    # 动态添加合理建议
     sugs = []
     if apca < 90: sugs.append("<b>提升文本清晰度：</b>排查低 APCA 的文字颜色，优先采用系统推荐的 Okabe-Ito 替代色。")
     if issues_count > 0: sugs.append("<b>阻断边界消融：</b>画面中存在视障边缘熔断点，请加大相邻组件的明度差，或添加实体描边。")
@@ -414,7 +432,6 @@ def generate_summary_section(score, apca, analysis_data):
     
     sug_html = "".join([f'<li class="flex items-start gap-2 before:content-[\'👉\'] before:shrink-0"><span>{s}</span></li>' for s in sugs])
 
-    # 优化 2：总结板块带上数据出处说明，增强权威性
     return f'''
         <section class="bg-slate-900 rounded-2xl p-8 text-white relative overflow-hidden shadow-xl" aria-label="审计终审结论">
             <div class="relative z-10">
@@ -432,7 +449,6 @@ def generate_summary_section(score, apca, analysis_data):
                                     <li class="flex justify-between items-center border-b border-slate-700/50 pb-3"><span class="whitespace-nowrap">⚠️ 高危熔断点</span><span class="text-3xl font-black text-amber-400 pl-4">{issues_count}</span></li>
                                     <li class="flex justify-between items-center"><span class="whitespace-nowrap">🔧 待处理工单</span><span class="text-3xl font-black text-rose-400 pl-4">{pairs_count}</span></li>
                                 </ul>
-                                
                                 <div class="mt-5 pt-4 border-t border-slate-700/50 text-[9px] text-slate-400 leading-relaxed space-y-1.5 bg-slate-900/40 p-3 rounded text-left">
                                     <b class="text-slate-300 block mb-1">📊 指标数据溯源说明：</b>
                                     <p>• <b>总分：</b>基础满分 100，根据各项不达标率及高危区域数进行扣分衰减得来。</p>
@@ -461,4 +477,4 @@ def generate_glossary_section():
     return '''<section class="bg-indigo-50/50 rounded-xl border border-indigo-100 p-8 no-print"><h2 class="text-sm font-bold text-indigo-900 uppercase tracking-widest mb-6">术语速查手册 (Glossary)</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6"><div><h3 class="text-xs font-bold text-indigo-700 mb-1">APCA (WCAG 3.0 现代算法)</h3><p class="text-[11px] text-indigo-900/70">下一代视觉算法。比传统对比度更准确地模拟了字体大小和深浅背景下的人眼知觉差异。</p></div><div><h3 class="text-xs font-bold text-indigo-700 mb-1">CVD Boundary Melt</h3><p class="text-[11px] text-indigo-900/70">极端缺陷。两颜色普通人看对比强烈，但色盲眼中色差会暴跌，导致组件边界完全消失。</p></div></div></section>'''
 
 if __name__ == '__main__':
-    print("HTML Report Generator updated with Tooltips and Summary Data Sources.")
+    print("HTML Report Generator updated with Edge Case UI Fallback.")
