@@ -79,62 +79,67 @@ Examples:
             analysis_data = analyze_image_file(args.input)
 
         # =========================================================
-        # 优化：将原始图片转为 Base64 注入数据包，供报告最上方展示
+        # 修复：直接从内存中读取原图对象，防止网页截图临时文件被删除后报错
         # =========================================================
         try:
             from html_report_generator import image_to_base64
             from PIL import Image
-            img_path = analysis_data.get('screenshot_path', args.input) if is_url(args.input) else args.input
-            with Image.open(img_path) as img:
+            Image.MAX_IMAGE_PIXELS = None 
+            
+            # 直接获取之前分析产生的 PIL Image 对象
+            img = analysis_data.get('original_image')
+            if img:
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
                 analysis_data['original_image_base64'] = image_to_base64(img)
         except Exception as e:
             print(f"  [Warning] 无法加载原图用于报告展示: {e}")
-        
+
         # =========================================================
-        # 新增：100x100 像素网格微观盲区排查 (Grid Micro-Analysis)
+        # 100x100 像素网格微观盲区排查 (Grid Micro-Analysis) 修复长图限制
         # =========================================================
         try:
             from color_analysis import extract_dominant_colors, check_comprehensive_compliance
             from html_report_generator import image_to_base64
             from PIL import Image
             
-            img = Image.open(img_path).convert('RGB')
-            w, h = img.size
-            block_size = 100
-            grid_issues = []
+            Image.MAX_IMAGE_PIXELS = None 
             
-            # 遍历整图，切分为 100x100 网格
-            for y in range(0, h, block_size):
-                for x in range(0, w, block_size):
-                    box = (x, y, min(x+block_size, w), min(y+block_size, h))
-                    # 忽略过小的边缘碎片 (小于 50x50 的不测)
-                    if box[2] - box[0] < 50 or box[3] - box[1] < 50: 
-                        continue 
-                    
-                    crop_img = img.crop(box)
-                    # 提取该 100x100 局部切片的 Top 2 主题色
-                    dom_colors = extract_dominant_colors(crop_img, num_colors=2)
-                    
-                    # 规则：如果该切片存在第二种颜色，且面积占比大于 10% (说明该切片不是纯底色，可能包含文字或图标边缘)
-                    if len(dom_colors) >= 2 and dom_colors[1]['frequency'] > 0.10:
-                        c1, c2 = dom_colors[0], dom_colors[1]
-                        # 对这两种颜色进行无障碍对比度审查
-                        metrics = check_comprehensive_compliance(c1['rgb'], c2['rgb'])
+            img = analysis_data.get('original_image')
+            if img:
+                img = img.convert('RGB')
+                w, h = img.size
+                
+                # 长网页防爆优化：如果图片非常长，我们只扫描网页首屏到中部的黄金区域 (最高 4000px)，防止崩溃
+                max_scan_height = min(h, 4000)
+                
+                # 根据屏幕宽度动态调整块大小，保证横向数量不要太多导致OOM
+                block_size = max(100, int(w / 15)) 
+                grid_issues = []
+                
+                for y in range(0, max_scan_height, block_size):
+                    for x in range(0, w, block_size):
+                        box = (x, y, min(x+block_size, w), min(y+block_size, h))
+                        if box[2] - box[0] < 50 or box[3] - box[1] < 50: 
+                            continue 
                         
-                        # 只收录异常切片：对比度 < 3.0 的危险组合
-                        if metrics['ratio'] < 3.0:
-                            grid_issues.append({
-                                'coord': f"X:{box[0]}-{box[2]}, Y:{box[1]}-{box[3]}",
-                                'image_base64': image_to_base64(crop_img, format='JPEG'),
-                                'c1': c1['hex'],
-                                'c2': c2['hex'],
-                                'ratio': metrics['ratio']
-                            })
+                        crop_img = img.crop(box)
+                        dom_colors = extract_dominant_colors(crop_img, num_colors=2)
+                        
+                        if len(dom_colors) >= 2 and dom_colors[1]['frequency'] > 0.10:
+                            c1, c2 = dom_colors[0], dom_colors[1]
+                            metrics = check_comprehensive_compliance(c1['rgb'], c2['rgb'])
                             
-            # 存入报告数据
-            analysis_data['grid_issues'] = grid_issues
+                            if metrics['ratio'] < 3.0:
+                                grid_issues.append({
+                                    'coord': f"X:{box[0]}-{box[2]}, Y:{box[1]}-{box[3]}",
+                                    'image_base64': image_to_base64(crop_img, format='JPEG'),
+                                    'c1': c1['hex'],
+                                    'c2': c2['hex'],
+                                    'ratio': metrics['ratio']
+                                })
+                                
+                analysis_data['grid_issues'] = grid_issues
         except Exception as e:
             print(f"  [Warning] 网格分析失败: {e}")
 
@@ -194,13 +199,7 @@ Examples:
                     safe_color = top_issue['safe_palette_suggestion']
                     print(f"SAFE_PALETTE_SUGGESTED: {safe_color['name']} ({safe_color['hex']})")
                     
-                dark_mode = top_issue.get('dark_mode_eval', {})
-                if dark_mode.get('applicable') and not dark_mode.get('survives_dark_mode'):
-                    print(f"DARK_MODE_WARNING: Fails when inverted to dark background")
-                    
         print("==============================\n")
-        
-        # 面向用户的常规输出
         print(f"✨ 无障碍分析完成！评分: {overall_score}/100")
         print(f"📄 详细 Dashboard 报告已生成: {output_path}")
 
@@ -209,7 +208,6 @@ Examples:
         print(f"STATUS: ERROR")
         print(f"ERROR_MSG: {str(e)}")
         print("==============================\n")
-        
         print(f"执行出错: {e}")
         if args.verbose:
             import traceback
