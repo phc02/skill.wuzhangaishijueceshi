@@ -8,7 +8,9 @@ This module handles web page screenshot capture and analysis.
 import os
 import time
 import tempfile
+from io import BytesIO
 from PIL import Image
+import numpy as np
 
 try:
     from selenium import webdriver

@@ -93,39 +93,37 @@ Examples:
             print(f"  [Warning] 无法加载原图用于报告展示: {e}")
         
         # =========================================================
-        # 100x100 像素网格微观盲区排查 (Grid Micro-Analysis) 修复长图限制
+        # 新增：100x100 像素网格微观盲区排查 (Grid Micro-Analysis)
         # =========================================================
         try:
             from color_analysis import extract_dominant_colors, check_comprehensive_compliance
             from html_report_generator import image_to_base64
             from PIL import Image
             
-            # 同样解除主程序的图片像素限制
-            Image.MAX_IMAGE_PIXELS = None 
-            
             img = Image.open(img_path).convert('RGB')
             w, h = img.size
-            
-            # 长网页防爆优化：如果图片非常长，我们只扫描网页首屏到中部的黄金区域 (最高 4000px)，防止崩溃
-            max_scan_height = min(h, 4000)
-            
-            # 根据屏幕宽度动态调整块大小，保证横向数量不要太多导致OOM
-            block_size = max(100, int(w / 15)) 
+            block_size = 100
             grid_issues = []
             
-            for y in range(0, max_scan_height, block_size):
+            # 遍历整图，切分为 100x100 网格
+            for y in range(0, h, block_size):
                 for x in range(0, w, block_size):
                     box = (x, y, min(x+block_size, w), min(y+block_size, h))
+                    # 忽略过小的边缘碎片 (小于 50x50 的不测)
                     if box[2] - box[0] < 50 or box[3] - box[1] < 50: 
                         continue 
                     
                     crop_img = img.crop(box)
+                    # 提取该 100x100 局部切片的 Top 2 主题色
                     dom_colors = extract_dominant_colors(crop_img, num_colors=2)
                     
+                    # 规则：如果该切片存在第二种颜色，且面积占比大于 10% (说明该切片不是纯底色，可能包含文字或图标边缘)
                     if len(dom_colors) >= 2 and dom_colors[1]['frequency'] > 0.10:
                         c1, c2 = dom_colors[0], dom_colors[1]
+                        # 对这两种颜色进行无障碍对比度审查
                         metrics = check_comprehensive_compliance(c1['rgb'], c2['rgb'])
                         
+                        # 只收录异常切片：对比度 < 3.0 的危险组合
                         if metrics['ratio'] < 3.0:
                             grid_issues.append({
                                 'coord': f"X:{box[0]}-{box[2]}, Y:{box[1]}-{box[3]}",
@@ -135,6 +133,7 @@ Examples:
                                 'ratio': metrics['ratio']
                             })
                             
+            # 存入报告数据
             analysis_data['grid_issues'] = grid_issues
         except Exception as e:
             print(f"  [Warning] 网格分析失败: {e}")
