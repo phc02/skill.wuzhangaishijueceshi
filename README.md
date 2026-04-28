@@ -1,2 +1,2 @@
 # skill.wuzhangaishijueceshi
-利用skill-creator来创建一个用于提升视觉障碍用户的网页体验的新的skill
+利用skill-creator来创建一个用于通过产出页面视觉障碍报告来帮助提升视觉障碍用户的网页体验的skill
