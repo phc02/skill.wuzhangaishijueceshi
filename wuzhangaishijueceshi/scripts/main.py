@@ -74,19 +74,20 @@ Examples:
 
     try:
         if is_url(args.input):
+            print("🌐 正在截取网页并进行基础色彩分析...")
             analysis_data = analyze_web_page(args.input)
         else:
+            print("🖼️ 正在读取图片并进行基础色彩分析...")
             analysis_data = analyze_image_file(args.input)
 
         # =========================================================
-        # 修复：直接从内存中读取原图对象，防止网页截图临时文件被删除后报错
+        # 内存读取：防止网页临时截图被删后找不到文件
         # =========================================================
         try:
             from html_report_generator import image_to_base64
             from PIL import Image
             Image.MAX_IMAGE_PIXELS = None 
             
-            # 直接获取之前分析产生的 PIL Image 对象
             img = analysis_data.get('original_image')
             if img:
                 if img.mode != 'RGB':
@@ -96,24 +97,15 @@ Examples:
             print(f"  [Warning] 无法加载原图用于报告展示: {e}")
 
         # =========================================================
-        # 100x100 像素网格微观盲区排查 (Grid Micro-Analysis) 修复长图限制
+        # 100x100 网格微观排查：带有“纯色短路”与“极限降维”的性能极速版
         # =========================================================
         try:
             from color_analysis import extract_dominant_colors, check_comprehensive_compliance
-            from html_report_generator import image_to_base64
-            from PIL import Image
+            print("🔍 正在执行 100x100 网格高密度微观排查 (已开启性能加速)...")
             
-            Image.MAX_IMAGE_PIXELS = None 
-            
-            img = analysis_data.get('original_image')
             if img:
-                img = img.convert('RGB')
                 w, h = img.size
-                
-                # 长网页防爆优化：如果图片非常长，我们只扫描网页首屏到中部的黄金区域 (最高 4000px)，防止崩溃
                 max_scan_height = min(h, 4000)
-                
-                # 根据屏幕宽度动态调整块大小，保证横向数量不要太多导致OOM
                 block_size = max(100, int(w / 15)) 
                 grid_issues = []
                 
@@ -124,7 +116,17 @@ Examples:
                             continue 
                         
                         crop_img = img.crop(box)
-                        dom_colors = extract_dominant_colors(crop_img, num_colors=2)
+                        
+                        # 【性能优化 1】纯色块探测：如果网格内全白或纯色，直接跳过，不跑机器算法
+                        extrema = crop_img.convert("L").getextrema()
+                        if extrema[1] - extrema[0] < 15:
+                            continue
+                            
+                        # 【性能优化 2】极速降维：将 100x100 缩小到 25x25，让 K-Means 瞬间完成
+                        fast_img = crop_img.copy()
+                        fast_img.thumbnail((25, 25))
+                        
+                        dom_colors = extract_dominant_colors(fast_img, num_colors=2)
                         
                         if len(dom_colors) >= 2 and dom_colors[1]['frequency'] > 0.10:
                             c1, c2 = dom_colors[0], dom_colors[1]
@@ -133,13 +135,14 @@ Examples:
                             if metrics['ratio'] < 3.0:
                                 grid_issues.append({
                                     'coord': f"X:{box[0]}-{box[2]}, Y:{box[1]}-{box[3]}",
-                                    'image_base64': image_to_base64(crop_img, format='JPEG'),
+                                    'image_base64': image_to_base64(crop_img, format='JPEG'), # 报告中依然展示高清截图
                                     'c1': c1['hex'],
                                     'c2': c2['hex'],
                                     'ratio': metrics['ratio']
                                 })
                                 
                 analysis_data['grid_issues'] = grid_issues
+                print(f"✅ 网格排查完成，共发现 {len(grid_issues)} 个低对比度雷区。")
         except Exception as e:
             print(f"  [Warning] 网格分析失败: {e}")
 
@@ -183,21 +186,6 @@ Examples:
             pairs = analysis_data['color_analysis'].get('color_pairs', [])
             failed_pairs = [p for p in pairs if not p['metrics']['aa_normal']]
             print(f"CONTRAST_ISSUES_FOUND: {len(failed_pairs)}")
-            
-            if failed_pairs:
-                top_issue = failed_pairs[0]
-                color1 = top_issue['color1']['hex']
-                color2 = top_issue['color2']['hex']
-                ratio = top_issue['metrics']['ratio']
-                apca_lc = top_issue['metrics']['apca_lc']
-                
-                print(f"TOP_ISSUE: Hex {color1} on {color2} (Ratio {ratio:.2f}:1, APCA Lc {apca_lc:.1f})")
-                
-                if top_issue.get('suggestion'):
-                    print(f"AUTO_FIX_SUGGESTED: {top_issue['suggestion']['hex']}")
-                if top_issue.get('safe_palette_suggestion'):
-                    safe_color = top_issue['safe_palette_suggestion']
-                    print(f"SAFE_PALETTE_SUGGESTED: {safe_color['name']} ({safe_color['hex']})")
                     
         print("==============================\n")
         print(f"✨ 无障碍分析完成！评分: {overall_score}/100")
