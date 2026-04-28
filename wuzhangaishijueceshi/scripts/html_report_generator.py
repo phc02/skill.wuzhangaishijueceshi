@@ -2,8 +2,8 @@
 """
 HTML Report Generator for wuzhangaishijueceshi skill.
 
-Optimized for: Long Page Context Cropping, Large Number Summary Layout, 
-Grid Micro-Analysis (High Density), and Printability.
+Optimized for: Explanatory Tooltips for all professional terms, 
+Data Source Traceability in Summary, and Printability.
 """
 
 import base64
@@ -32,7 +32,6 @@ def generate_annotated_thumbnail(img_base64, b1, b2):
         
         c1, c2 = (b1['center_x'], b1['center_y']), (b2['center_x'], b2['center_y'])
         
-        # 在原坐标上绘制连线和靶心
         draw.line([c1, c2], fill=(234, 179, 8, 200), width=4)
         r = 16 
         draw.ellipse([c1[0]-r, c1[1]-r, c1[0]+r, c1[1]+r], outline=(239, 68, 68, 255), width=4)
@@ -42,7 +41,6 @@ def generate_annotated_thumbnail(img_base64, b1, b2):
         
         img = Image.alpha_composite(img, overlay).convert('RGB')
         
-        # 优化点：针对网页长截图进行“局部裁剪”，提取冲突区域周围 800x600 的特写窗口
         cx = (c1[0] + c2[0]) // 2
         cy = (c1[1] + c2[1]) // 2
         crop_box = (
@@ -82,6 +80,9 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
     apca_rate = stats.get('apca_pass_rate', 0) * 100
     ui_rate = stats.get('ui_component_pass_rate', 0) * 100
 
+    # 公共的 Info Icon
+    info_icon = '<svg class="w-4 h-4 text-slate-400 hover:text-indigo-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+
     html_content = f'''<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -97,7 +98,7 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
             visibility: hidden; width: 260px; background-color: #1e293b; color: #f8fafc;
             text-align: left; border-radius: 6px; padding: 12px; position: absolute;
             bottom: 135%; left: 50%; transform: translateX(-50%); opacity: 0;
-            transition: opacity 0.2s, visibility 0.2s; font-size: 0.75rem; line-height: 1.5; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); pointer-events: none;
+            transition: opacity 0.2s, visibility 0.2s; font-size: 0.75rem; line-height: 1.5; font-weight: normal; text-transform: none; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); pointer-events: none;
         }}
         .tooltip-container .tooltiptext::after {{ content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #1e293b transparent transparent transparent; }}
         .tooltip-container:hover .tooltiptext {{ visibility: visible; opacity: 1; }}
@@ -127,6 +128,9 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12" role="main">
 '''
 
+    # ========================================================
+    # 优化 1：系统包容性分析概览 - 加上完备的 Tooltip
+    # ========================================================
     html_content += f'''
         <section id="overview" aria-label="诊断概览">
             <div class="mb-6 text-center">
@@ -135,21 +139,30 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
             </div>
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm col-span-1 lg:col-span-4 text-center flex flex-col justify-center">
-                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">综合健康度总分</h3>
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex justify-center items-center gap-1.5">
+                        综合健康度总分
+                        <div class="tooltip-container">{info_icon}<span class="tooltiptext">基础分 100 分，系统按对比度不达标率及高危色盲熔断区域数量进行加权惩罚扣分。</span></div>
+                    </h3>
                     <div class="text-6xl font-bold {score_color} tracking-tighter mb-4">{overall_score}</div>
                     <div class="w-full bg-slate-100 rounded-full h-1.5 mb-3"><div class="{score_bg} h-1.5 rounded-full" style="width: {overall_score}%"></div></div>
                 </div>
                 <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm col-span-1 lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                     <div class="flex flex-col justify-center">
                         <div class="flex justify-between items-center mb-2">
-                            <span class="text-sm font-semibold text-slate-700">APCA 视知觉合规率</span>
+                            <span class="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                                APCA 视知觉合规率
+                                <div class="tooltip-container">{info_icon}<span class="tooltiptext"><b>APCA (WCAG 3.0)：</b>下一代视网膜知觉算法。能精准测算深浅模式下“文字与背景”的真实阅读清晰度。普通文本建议通过。</span></div>
+                            </span>
                             <span class="text-lg font-bold text-indigo-600">{apca_rate:.1f}%</span>
                         </div>
                         <div class="w-full bg-slate-100 rounded-full h-2 mb-2"><div class="bg-indigo-500 h-2 rounded-full" style="width: {apca_rate}%"></div></div>
                     </div>
                     <div class="flex flex-col justify-center border-t md:border-t-0 md:border-l border-slate-100 md:pl-8 pt-4 md:pt-0">
                         <div class="flex justify-between items-center mb-2">
-                            <span class="text-sm font-semibold text-slate-700">UI 控件边界清晰度</span>
+                            <span class="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                                UI 控件边界清晰度
+                                <div class="tooltip-container">{info_icon}<span class="tooltiptext"><b>非文本对比度：</b>用于评估界面上的按钮外框、输入框边缘、状态图标等 UI 控件能否被低视力用户清晰识别，安全阈值 3.0:1。</span></div>
+                            </span>
                             <span class="text-lg font-bold text-sky-600">{ui_rate:.1f}%</span>
                         </div>
                         <div class="w-full bg-slate-100 rounded-full h-2 mb-2"><div class="bg-sky-500 h-2 rounded-full" style="width: {ui_rate}%"></div></div>
@@ -173,7 +186,7 @@ def generate_html_report(analysis_data, output_path, threshold=5.0):
 
     html_content += generate_recommendations_section(analysis_data)
 
-    # 深度增强总结模块，修复字号、换行，增加实战建议
+    # 优化 2：带数据来源说明的终结结论
     html_content += generate_summary_section(overall_score, apca_rate, analysis_data)
 
     html_content += generate_glossary_section()
@@ -241,7 +254,9 @@ def generate_grid_analysis_section(grid_issues):
     return html
 
 def generate_contrast_section(color_analysis):
-    html = '''
+    info_icon = '<svg class="w-3.5 h-3.5 text-slate-400 hover:text-indigo-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+    
+    html = f'''
         <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-visible">
             <div class="px-6 py-5 border-b border-slate-200 bg-slate-50 rounded-t-xl">
                 <h2 class="font-bold text-slate-800 text-base mb-2">色彩矩阵压力测试 (Color Matrix Audit)</h2>
@@ -253,9 +268,25 @@ def generate_contrast_section(color_analysis):
                 <thead class="bg-slate-50/50">
                     <tr>
                         <th class="px-6 py-3 text-left text-[10px] font-bold text-slate-400 uppercase">交叉颜色对 (前景/背景)</th>
-                        <th class="px-6 py-3 text-center text-[10px] font-bold text-slate-400 uppercase">WCAG 2.1</th>
-                        <th class="px-6 py-3 text-center text-[10px] font-bold text-slate-400 uppercase">APCA (Lc)</th>
-                        <th class="px-6 py-3 text-center text-[10px] font-bold text-slate-400 uppercase">UI 控件安全</th>
+                        
+                        <th class="px-6 py-3 text-center text-[10px] font-bold text-slate-400 uppercase">
+                            <div class="flex items-center justify-center gap-1">
+                                WCAG 2.1
+                                <div class="tooltip-container">{info_icon}<span class="tooltiptext"><b>经典无障碍国际标准。</b><br>要求普通文本对比度达到 4.5:1，大标题达到 3.0:1，否则将影响普通人群阅读。</span></div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-3 text-center text-[10px] font-bold text-slate-400 uppercase">
+                            <div class="flex items-center justify-center gap-1">
+                                APCA (Lc)
+                                <div class="tooltip-container">{info_icon}<span class="tooltiptext"><b>下一代视觉感算标准。</b><br>分数单位为 Lc。普通文本要求绝对值大于 60。数值越高，文本的视觉对比越清晰。</span></div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-3 text-center text-[10px] font-bold text-slate-400 uppercase">
+                            <div class="flex items-center justify-center gap-1">
+                                UI 控件安全
+                                <div class="tooltip-container">{info_icon}<span class="tooltiptext"><b>非文本对比边界。</b><br>验证该色彩是否足以让“图标”或“组件边缘”在底色上被明确识别 (安全阈值 3.0:1)。</span></div>
+                            </div>
+                        </th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-slate-100">
@@ -285,7 +316,7 @@ def generate_similar_regions_section(analysis_data):
     regions = analysis_data.get('similar_regions', {}).get('similar_regions', [])
     orig_b64 = analysis_data.get('original_image_base64')
     html = f'''
-        <section class="bg-white rounded-xl border border-slate-200 shadow-sm">
+        <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-visible">
             <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 rounded-t-xl">
                 <h2 class="font-bold text-slate-800">视障边缘消融预警 (CVD Melt Detection)</h2>
                 <p class="text-[11px] text-slate-500 mt-1">发现那些正常人看着清晰，但在色盲眼中彻底糊在一起的伪装边界。</p>
@@ -300,7 +331,7 @@ def generate_similar_regions_section(analysis_data):
         border_col, tag_bg, tag_text = ("border-purple-300", "bg-purple-100", "text-purple-700") if melt_risks else ("border-rose-200", "bg-rose-100", "text-rose-700")
         
         annotated_img_b64 = generate_annotated_thumbnail(orig_b64, b1, b2)
-        img_html = f'<img src="data:image/jpeg;base64,{annotated_img_b64}" class="w-full h-32 object-cover rounded shadow-inner">' if annotated_img_b64 else ""
+        img_html = f'<img src="data:image/jpeg;base64,{annotated_img_b64}" class="w-full h-32 object-cover rounded shadow-inner cursor-zoom-in">' if annotated_img_b64 else ""
 
         html += f'''
                 <div class="border {border_col} rounded-lg p-5 bg-white shadow-sm flex flex-col justify-between">
@@ -312,7 +343,7 @@ def generate_similar_regions_section(analysis_data):
                                 <span class="tooltiptext"><b>Delta E (ΔE)：</b>衡量两种颜色视觉差异。数值越小越接近。小于 3.0 则人眼极难分清边界。</span>
                             </div>
                         </div>
-                        <div class="mt-2 mb-2 bg-slate-100 p-1 rounded border border-slate-200 cursor-zoom-in">{img_html}</div>
+                        <div class="mt-2 mb-2 bg-slate-100 p-1 rounded border border-slate-200">{img_html}</div>
                         <p class="text-[11px] text-slate-600 leading-relaxed mt-2 text-center">上方标出的连线处存在显著的视觉辨识隐患</p>
                     </div>
                 </div>
@@ -383,6 +414,7 @@ def generate_summary_section(score, apca, analysis_data):
     
     sug_html = "".join([f'<li class="flex items-start gap-2 before:content-[\'👉\'] before:shrink-0"><span>{s}</span></li>' for s in sugs])
 
+    # 优化 2：总结板块带上数据出处说明，增强权威性
     return f'''
         <section class="bg-slate-900 rounded-2xl p-8 text-white relative overflow-hidden shadow-xl" aria-label="审计终审结论">
             <div class="relative z-10">
@@ -400,6 +432,14 @@ def generate_summary_section(score, apca, analysis_data):
                                     <li class="flex justify-between items-center border-b border-slate-700/50 pb-3"><span class="whitespace-nowrap">⚠️ 高危熔断点</span><span class="text-3xl font-black text-amber-400 pl-4">{issues_count}</span></li>
                                     <li class="flex justify-between items-center"><span class="whitespace-nowrap">🔧 待处理工单</span><span class="text-3xl font-black text-rose-400 pl-4">{pairs_count}</span></li>
                                 </ul>
+                                
+                                <div class="mt-5 pt-4 border-t border-slate-700/50 text-[9px] text-slate-400 leading-relaxed space-y-1.5 bg-slate-900/40 p-3 rounded text-left">
+                                    <b class="text-slate-300 block mb-1">📊 指标数据溯源说明：</b>
+                                    <p>• <b>总分：</b>基础满分 100，根据各项不达标率及高危区域数进行扣分衰减得来。</p>
+                                    <p>• <b>APCA率：</b>基于提取的 Top 15 主题色作矩阵交叉比对，满足 Lc 标准阈值的比例。</p>
+                                    <p>• <b>熔断点：</b>基于机器视觉提取出的相邻色块，在色盲视界下运算出 ΔE < 3.0 的区域总数。</p>
+                                    <p>• <b>工单数：</b>未能通过传统 WCAG 2.1 AA 级基础测试的交叉颜色对总计。</p>
+                                </div>
                             </div>
                             <div class="bg-indigo-900/20 p-5 rounded-xl border border-indigo-500/30 flex flex-col h-full">
                                 <h4 class="text-indigo-300 text-xs font-bold uppercase tracking-widest mb-4">下一步行动建议</h4>
@@ -421,4 +461,4 @@ def generate_glossary_section():
     return '''<section class="bg-indigo-50/50 rounded-xl border border-indigo-100 p-8 no-print"><h2 class="text-sm font-bold text-indigo-900 uppercase tracking-widest mb-6">术语速查手册 (Glossary)</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6"><div><h3 class="text-xs font-bold text-indigo-700 mb-1">APCA (WCAG 3.0 现代算法)</h3><p class="text-[11px] text-indigo-900/70">下一代视觉算法。比传统对比度更准确地模拟了字体大小和深浅背景下的人眼知觉差异。</p></div><div><h3 class="text-xs font-bold text-indigo-700 mb-1">CVD Boundary Melt</h3><p class="text-[11px] text-indigo-900/70">极端缺陷。两颜色普通人看对比强烈，但色盲眼中色差会暴跌，导致组件边界完全消失。</p></div></div></section>'''
 
 if __name__ == '__main__':
-    print("HTML Report Generator optimized for Web Pages and Layout Fixes.")
+    print("HTML Report Generator updated with Tooltips and Summary Data Sources.")
